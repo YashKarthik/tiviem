@@ -13,6 +13,12 @@ for (let counter = 0; counter < bytecode.length; ) {
   counter += 2;
 
   if (opcode >= 0x5F && opcode <= 0x7F) { // PUSH range
+    if (opcode == 0x5F) { // PUSH0, does not read args from bytecode;
+      const result = instructions[opcode].implementation();
+      stack.push(...result);
+      continue;
+    }
+
     const numberOfArgs = parseInt(instructions[opcode].name.slice(4,)); // we get the number of bytes, to be read, from name; eg: PUSH1 => 1 byte
     const pushArgs = BigInt("0x" + bytecode.slice(counter, counter+numberOfArgs*2)); // We read numberOfArgs bytes from the bytocode; *2 as each byte = 2 characters in hex
     counter += numberOfArgs*2; // *2 cuz above

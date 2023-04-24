@@ -57,30 +57,48 @@ export const instructions = {
       return [ result ];
     },
   },
+
+  // 0x5F - 0x7F: PUSH range.
   0x5F: {
     name: 'PUSH0',
     minimumGas: 2,
     implementation: () => [0n],
   },
-  0x60: {
-    name: 'PUSH1',
-    minimumGas: 3,
-    implementation: () => [],
-  },
-  0x61: {
-    name: 'PUSH2',
-    minimumGas: 3,
-    implementation: () => [],
-  },
-  0x7F: {
-    name: 'PUSH32',
-    minimumGas: 3,
-    implementation: () => [],
-  },
+  0x60: { name: 'PUSH1', minimumGas: 3 },
+  0x61: { name: 'PUSH2', minimumGas: 3 },
+  0x62: { name: 'PUSH3', minimumGas: 3 },
+  0x63: { name: 'PUSH4', minimumGas: 3 },
+  0x64: { name: 'PUSH5', minimumGas: 3 },
+  0x65: { name: 'PUSH6', minimumGas: 3 },
+  0x66: { name: 'PUSH7', minimumGas: 3 },
+  0x67: { name: 'PUSH8', minimumGas: 3 },
+  0x68: { name: 'PUSH9', minimumGas: 3 },
+  0x69: { name: 'PUSH10', minimumGas: 3 },
+  0x6a: { name: 'PUSH11', minimumGas: 3 },
+  0x6b: { name: 'PUSH12', minimumGas: 3 },
+  0x6c: { name: 'PUSH13', minimumGas: 3 },
+  0x6d: { name: 'PUSH14', minimumGas: 3 },
+  0x6e: { name: 'PUSH15', minimumGas: 3 },
+  0x6f: { name: 'PUSH16', minimumGas: 3 },
+  0x70: { name: 'PUSH17', minimumGas: 3 },
+  0x71: { name: 'PUSH18', minimumGas: 3 },
+  0x72: { name: 'PUSH19', minimumGas: 3 },
+  0x73: { name: 'PUSH20', minimumGas: 3 },
+  0x74: { name: 'PUSH21', minimumGas: 3 },
+  0x75: { name: 'PUSH22', minimumGas: 3 },
+  0x76: { name: 'PUSH23', minimumGas: 3 },
+  0x77: { name: 'PUSH24', minimumGas: 3 },
+  0x78: { name: 'PUSH25', minimumGas: 3 },
+  0x79: { name: 'PUSH26', minimumGas: 3 },
+  0x7a: { name: 'PUSH27', minimumGas: 3 },
+  0x7b: { name: 'PUSH28', minimumGas: 3 },
+  0x7c: { name: 'PUSH29', minimumGas: 3 },
+  0x7d: { name: 'PUSH30', minimumGas: 3 },
+  0x7e: { name: 'PUSH31', minimumGas: 3 },
+  0x7f: { name: 'PUSH32', minimumGas: 3 },
 };
 
 const MAX_UINT256 = 2n ** 256n;
-
 
 function floorBigInt(n: bigint): bigint {
   let msd = n & -(1n << 53n); // get the most significant digit
