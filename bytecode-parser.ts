@@ -7,7 +7,9 @@ if (!bytecode) throw new Error("No bytecode given.");
 const stack: bigint[] = [];
 
 for (let counter = 0; counter < bytecode.length; ) {
+  console.log(bytecode.slice(0, counter) + "🔺" + bytecode.slice(counter,));
   console.log("Stack:", stack, "\n");
+
   const opcode = parseInt("0x" + bytecode.slice(counter, counter + 2)) as keyof typeof instructions;
   if (!opcode) throw new Error(`Invalid OPCODE: ${opcode}`);
   counter += 2;
@@ -30,6 +32,7 @@ for (let counter = 0; counter < bytecode.length; ) {
     continue;
   }
 
+  // @ts-expect-error This section runs only when out of PUSH range.
   const stackInputLength = instructions[opcode].implementation.length; // read these many words from stack
   const stackInput: bigint[] = [];
   for (let inputNum = 0; inputNum < stackInputLength; inputNum++) {
@@ -41,6 +44,7 @@ for (let counter = 0; counter < bytecode.length; ) {
 
   console.log("0x" + opcode, instructions[opcode].name, stackInput);
 
+  // @ts-expect-error This section runs only when out of PUSH range.
   const result = instructions[opcode].implementation(...(stackInput as [bigint, bigint]));
   stack.push(...result);
 }

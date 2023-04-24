@@ -3,11 +3,6 @@
   * opcode name, minimumGas and implementation for the opcode.
   * The math needs to be fixed to replicate EVM errors / edgecases.
   **/
-type Instruction = {
-  name: string,
-  minimumGas: number,
-  implementation: Function
-}
 
 export const instructions = {
   0x00: {
@@ -55,6 +50,15 @@ export const instructions = {
       }
 
       return [ result ];
+    },
+  },
+
+  0x06: {
+    name: 'MOD',
+    minimumGas: 5,
+    implementation: (a: bigint, b: bigint) => {
+      if (b == 0n) return [0n];
+      return [a % b];
     },
   },
 
