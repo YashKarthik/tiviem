@@ -47,9 +47,14 @@ export const instructions = {
       if (b == 0n || a == 0n) return [0n];
       if (a < b) return [0n];
 
-      const result = a % MAX_UINT256;
-      if (result < 0n) return [ result + MAX_UINT256 ];
-      return [ result ]
+      let result = a / b;
+      if (result < 0 && a > 0 && b > 0 || result > 0 && a < 0 && b < 0) {
+        result = floorBigInt(result);
+      } else {
+        result = ceilBigInt(result);
+      }
+
+      return [ result ];
     },
   },
   0x5F: {
@@ -75,3 +80,23 @@ export const instructions = {
 };
 
 const MAX_UINT256 = 2n ** 256n;
+
+
+function floorBigInt(n: bigint): bigint {
+  let msd = n & -(1n << 53n); // get the most significant digit
+  let delta = msd & (1n << 53n) - 1n; // get the lower 53 bits
+
+  if (delta != 0n) return n - delta;
+  // otherwise simply return the number
+  return n;
+}
+
+function ceilBigInt(n: bigint): bigint {
+  let msd = n & -(1n << 53n);
+  let delta = msd & (1n << 53n) - 1n;
+
+  // if the delta bit is set, the number is negative, so add delta
+  if (delta != 0n) return n + delta;
+  // otherwise simply return the number
+  return n;
+}
