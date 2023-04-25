@@ -8,7 +8,7 @@ export const instructions = {
   0x00: {
     name: 'STOP',
     minimumGas: 0,
-    implementation: () => { throw new Error("STOP") }
+    implementation: () => []
   },
   0x01: {
     name: 'ADD',
@@ -85,6 +85,12 @@ export const instructions = {
       if (b == 0n) return [0n];
       return [a % b];
     },
+  },
+
+  0x50: {
+    name: 'POP',
+    minimumGas: 2,
+    implementation: (_a: bigint) => [],
   },
 
   // 0x5F - 0x7F: PUSH range.
