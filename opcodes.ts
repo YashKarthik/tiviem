@@ -87,6 +87,29 @@ export const instructions = {
     },
   },
 
+  0x08: {
+    name: 'ADDMOD',
+    minimumGas: 8,
+    implementation: (a: bigint, b: bigint, N: bigint) => {
+      if (N == 0n) return [0n];
+      return [ (a + b) % N];
+    },
+  },
+  0x09: {
+    name: 'MULMOD',
+    minimumGas: 8,
+    implementation: (a: bigint, b: bigint, N: bigint) => {
+      if (N == 0n) return [0n];
+      return [ (a * b) % N];
+    },
+  },
+
+  0x0a: {
+    name: 'EXP',
+    minimumGas: 10,
+    implementation: (a: bigint, exponent: bigint) => [ BigInt.asUintN(256, a ** exponent) ],
+  },
+
   0x50: {
     name: 'POP',
     minimumGas: 2,
