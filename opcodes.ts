@@ -52,6 +52,31 @@ export const instructions = {
       return [ result ];
     },
   },
+  0x05: {
+    name: 'SDIV',
+    minimumGas: 5,
+    implementation: (a: bigint, b: bigint) => {
+      if (b == 0n || a == 0n) return [0n];
+
+      let sign = 1n;
+      const isANegative = isNegativeUint(a);
+      const isBNegative = isNegativeUint(b);
+
+      if (!(isANegative && isBNegative)) {}                   // both positive => positive
+      else if (isANegative && isBNegative) {}                 // both negative => positive
+      else if (!isANegative && isBNegative) { sign = -1n }    // positive, neg => neg
+      else if (isANegative && !isBNegative) { sign = -1n }    // positive, neg => neg
+
+      let result = a / b;
+      if (result < 0 && a > 0 && b > 0 || result > 0 && a < 0 && b < 0) {
+        result = floorBigInt(sign*result);
+      } else {
+        result = ceilBigInt(sign*result);
+      }
+
+      return [ result ];
+    },
+  },
 
   0x06: {
     name: 'MOD',
@@ -121,4 +146,8 @@ function ceilBigInt(n: bigint): bigint {
   if (delta != 0n) return n + delta;
   // otherwise simply return the number
   return n;
+}
+
+function isNegativeUint(n: bigint): boolean {
+  return (n & 0x8000000000000000000000000000000000000000000000000000000000000000n) !== 0n;
 }
