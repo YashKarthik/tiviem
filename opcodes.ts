@@ -110,6 +110,42 @@ export const instructions = {
     implementation: (a: bigint, exponent: bigint) => [ BigInt.asUintN(256, a ** exponent) ],
   },
 
+  0x10: {
+    name: 'LT',
+    minimumGas: 3,
+    implementation: (a: bigint, b: bigint) => {
+      return [ BigInt(a < b) ];
+    },
+  },
+
+  0x11: {
+    name: 'GT',
+    minimumGas: 3,
+    implementation: (a: bigint, b: bigint) => {
+      return [ BigInt(a > b) ];
+    },
+  },
+
+  0x12: {
+    name: 'SLT',
+    minimumGas: 3,
+    implementation: (a: bigint, b: bigint) => {
+      a = BigInt.asIntN(256, a);
+      b = BigInt.asIntN(256, b);
+      return [ BigInt(a < b) ];
+    },
+  },
+
+  0x13: {
+    name: 'SGT',
+    minimumGas: 3,
+    implementation: (a: bigint, b: bigint) => {
+      a = BigInt.asIntN(256, a);
+      b = BigInt.asIntN(256, b);
+      return [ BigInt(a > b) ];
+    },
+  },
+
   0x50: {
     name: 'POP',
     minimumGas: 2,
