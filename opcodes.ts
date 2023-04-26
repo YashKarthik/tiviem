@@ -107,9 +107,10 @@ export const instructions = {
   0x0a: {
     name: 'EXP',
     minimumGas: 10,
-    implementation: (a: bigint, exponent: bigint) => [ BigInt.asUintN(256, a ** exponent) ],
+    implementation: (a: bigint, exponent: bigint) => [ BigInt.asUintN(256, a ** exponent) ]
   },
 
+  // COMPARISON / BITWISE opcodes
   0x10: {
     name: 'LT',
     minimumGas: 3,
@@ -146,6 +147,43 @@ export const instructions = {
     },
   },
 
+  0x14: {
+    name: 'EQ',
+    minimumGas: 3,
+    implementation: (a: bigint, b: bigint) => [ BigInt(a == b) ]
+  },
+
+  0x15: {
+    name: 'ISZERO',
+    minimumGas: 3,
+    implementation: (a: bigint) => [ BigInt(a == 0n) ]
+  },
+
+  0x16: {
+    name: 'AND',
+    minimumGas: 3,
+    implementation: (a: bigint, b: bigint) => [BigInt.asUintN(256, a & b)]
+  },
+
+  0x17: {
+    name: 'OR',
+    minimumGas: 3,
+    implementation: (a: bigint, b: bigint) => [BigInt.asUintN(256, a | b)]
+  },
+
+  0x18: {
+    name: 'XOR',
+    minimumGas: 3,
+    implementation: (a: bigint, b: bigint) => [BigInt.asUintN(256, a ^ b)]
+  },
+
+  0x19: {
+    name: 'NOT',
+    minimumGas: 3,
+    implementation: (a: bigint) => [BigInt.asUintN(256, ~a)]
+  },
+
+  // STACK MANIPULATION
   0x50: {
     name: 'POP',
     minimumGas: 2,
