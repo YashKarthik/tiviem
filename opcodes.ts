@@ -110,6 +110,28 @@ export const instructions = {
     implementation: (a: bigint, exponent: bigint) => [ BigInt.asUintN(256, a ** exponent) ]
   },
 
+  0x0b: {
+    name: 'SIGNEXTEND',
+    minimumGas: 5,
+    implementation: (b: bigint, x: bigint) => {
+      // b: size in bytes - 1 of the integer to extend;
+      // x: the integer to extend
+      if (!(b < 31n)) {
+        // b is not less than 31
+        // => x is 32 bytes long (full size) => no sign extension
+        return [ x ];
+      }
+
+      const bits = (Number(b) + 1)*8 // size of x in bits; safe to use Number(b) as b must resolve to 32 or less;
+      const msb = BigInt(1 << bits - 1) & x; // Check the MSB of x
+      if (!msb) { // positive number => no sign extension required;
+        return [ x ];
+      }
+
+      return [ BigInt.asUintN(256, ~msb) | x ];
+    }
+  },
+
   // COMPARISON / BITWISE opcodes
   0x10: {
     name: 'LT',
@@ -253,4 +275,16 @@ function ceilBigInt(n: bigint): bigint {
 
 function isNegativeUint(n: bigint): boolean {
   return (n & 0x8000000000000000000000000000000000000000000000000000000000000000n) !== 0n;
+}
+
+function signExtend(n: bigint, x: bigint): bigint {
+  const mask = 0xffn << (n * 8n); // Create a mask with 1s in the higher bits and 0s in the lower bits
+  const signBit = x & (1n << (n * 8n + 7n)); // Extract the sign bit from the n-th byte
+  if (signBit) {
+    // If the sign bit is set, fill the higher bits with 1s
+    return x | mask;
+  } else {
+    // If the sign bit is not set, fill the higher bits with 0s
+    return x & ~mask;
+  }
 }
