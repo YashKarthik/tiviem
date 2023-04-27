@@ -15,8 +15,8 @@ export const instructions = {
     minimumGas: 3,
     implementation: (a: bigint, b: bigint) => {
       const result = a + b;
-      if (result >= MAX_UINT256) return [result % MAX_UINT256];
-      return [result];
+      if (result >= MAX_UINT256 + 1n) return [result % (MAX_UINT256 + 1n)];
+      return [ result ];
     },
   },
   0x02: {
@@ -31,8 +31,8 @@ export const instructions = {
     minimumGas: 3,
     implementation: (a: bigint, b: bigint) => {
       const result = a - b;
-      if (result < 0n) return [MAX_UINT256 + result];
-      return [result];
+      if (result < 0n) return [MAX_UINT256 + 1n + result];
+      return [ result ];
     },
   },
   0x04: {
@@ -56,26 +56,15 @@ export const instructions = {
     name: 'SDIV',
     minimumGas: 5,
     implementation: (a: bigint, b: bigint) => {
-      if (b == 0n || a == 0n) return [0n];
+      if (b == 0n || a == 0n) return [ 0n ];
 
-      let sign = 1n;
-      const isANegative = isNegativeUint(a);
-      const isBNegative = isNegativeUint(b);
+      a = BigInt.asIntN(256, a);
+      b = BigInt.asIntN(256, b);
 
-      if (!(isANegative && isBNegative)) {}                   // both positive => positive
-      else if (isANegative && isBNegative) {}                 // both negative => positive
-      else if (!isANegative && isBNegative) { sign = -1n }    // positive, neg => neg
-      else if (isANegative && !isBNegative) { sign = -1n }    // positive, neg => neg
-
-      let result = a / b;
-      if (result < 0 && a > 0 && b > 0 || result > 0 && a < 0 && b < 0) {
-        result = floorBigInt(sign*result);
-      } else {
-        result = ceilBigInt(sign*result);
-      }
+      let result = BigInt.asUintN(256, a / b);
 
       return [ result ];
-    },
+    }
   },
 
   0x06: {
@@ -84,6 +73,20 @@ export const instructions = {
     implementation: (a: bigint, b: bigint) => {
       if (b == 0n) return [0n];
       return [a % b];
+    },
+  },
+
+  0x07: {
+    name: 'SMOD',
+    minimumGas: 5,
+    implementation: (a: bigint, b: bigint) => {
+      if (b == 0n) return [0n];
+      return [
+        BigInt.asUintN(
+          256,
+          BigInt.asIntN(256, a) % BigInt.asIntN(256, b)
+        )
+      ];
     },
   },
 
@@ -205,6 +208,47 @@ export const instructions = {
     implementation: (a: bigint) => [BigInt.asUintN(256, ~a)]
   },
 
+  0x1b: {
+    name: 'SHL',
+    minimumGas: 3,
+    implementation: (shift: bigint, value: bigint) => {
+      if (shift > 255n) return [ 0n ];
+      return [BigInt.asUintN(256, value << shift)];
+    }
+  },
+
+  0x1c: {
+    name: 'SHR',
+    minimumGas: 3,
+    implementation: (shift: bigint, value: bigint) => {
+      if (shift > 255n) return [ 0n ];
+      return [BigInt.asUintN(256, value >> shift)];
+    }
+  },
+
+  0x1d: {
+    name: 'SAR',
+    minimumGas: 3,
+    implementation: (shift: bigint, value: bigint) => {
+      const isSigned = BigInt.asIntN(256, value) < 0;
+
+      if (!isSigned) return [ value >> shift ]; // the incoming bits are 0, which is the msb.
+
+      if (shift > 256n) {
+        // we could skip these constant cases as the normal operation would return the same result
+        // but doing with these large values, we could run out of memory, especially in JS/TS
+        return [ BigInt.asUintN(256, MAX_UINT256) ]; // all the bits will be replaced by 1 => max value;
+      }
+
+      const temp = value >> shift
+      // next convert the bits that just came in from 0 to 1.
+      // A mask that enables `shift` number of bits.
+      const mask = MAX_UINT256 << (256n - shift);
+
+      return [ BigInt.asUintN(256,  temp | mask)];
+    }
+  },
+
   // STACK MANIPULATION
   0x50: {
     name: 'POP',
@@ -252,7 +296,7 @@ export const instructions = {
   0x7f: { name: 'PUSH32', minimumGas: 3 },
 };
 
-const MAX_UINT256 = 2n ** 256n;
+const MAX_UINT256 = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // 2^256 - 1
 
 function floorBigInt(n: bigint): bigint {
   let msd = n & -(1n << 53n); // get the most significant digit
@@ -271,20 +315,4 @@ function ceilBigInt(n: bigint): bigint {
   if (delta != 0n) return n + delta;
   // otherwise simply return the number
   return n;
-}
-
-function isNegativeUint(n: bigint): boolean {
-  return (n & 0x8000000000000000000000000000000000000000000000000000000000000000n) !== 0n;
-}
-
-function signExtend(n: bigint, x: bigint): bigint {
-  const mask = 0xffn << (n * 8n); // Create a mask with 1s in the higher bits and 0s in the lower bits
-  const signBit = x & (1n << (n * 8n + 7n)); // Extract the sign bit from the n-th byte
-  if (signBit) {
-    // If the sign bit is set, fill the higher bits with 1s
-    return x | mask;
-  } else {
-    // If the sign bit is not set, fill the higher bits with 0s
-    return x & ~mask;
-  }
 }
