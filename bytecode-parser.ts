@@ -65,6 +65,12 @@ export function evm(bytecode:string): Result {
       continue;
     }
 
+    if (opcode >= 0x90 && opcode <= 0x9F) { // SWAP range
+      // @ts-expect-error SWAP range has implementation, soon push will too;
+      instructions[opcode].implementation(stack);
+      continue;
+    }
+
     // @ts-expect-error This section runs only when out of PUSH range.
     const stackInputLength = instructions[opcode].implementation.length; // read these many words from stack
     const stackInput: bigint[] = [];
