@@ -309,6 +309,24 @@ export const instructions = {
   0x7d: { name: 'PUSH30', minimumGas: 3 },
   0x7e: { name: 'PUSH31', minimumGas: 3 },
   0x7f: { name: 'PUSH32', minimumGas: 3 },
+
+  // 0x80 - 0x8f: DUP range
+  0x80: { name: 'DUP1' , minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(1, stack) ]},
+  0x81: { name: 'DUP2' , minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(2, stack) ]},
+  0x82: { name: 'DUP3' , minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(3, stack) ]},
+  0x83: { name: 'DUP4' , minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(4, stack) ]},
+  0x84: { name: 'DUP5' , minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(5, stack) ]},
+  0x85: { name: 'DUP6' , minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(6, stack) ]},
+  0x86: { name: 'DUP7' , minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(7, stack) ]},
+  0x87: { name: 'DUP8' , minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(8, stack) ]},
+  0x88: { name: 'DUP9' , minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(9, stack) ]},
+  0x89: { name: 'DUP10', minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(10, stack) ]},
+  0x8a: { name: 'DUP11', minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(11, stack) ]},
+  0x8b: { name: 'DUP12', minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(12, stack) ]},
+  0x8c: { name: 'DUP13', minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(13, stack) ]},
+  0x8d: { name: 'DUP14', minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(14, stack) ]},
+  0x8e: { name: 'DUP15', minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(15, stack) ]},
+  0x8f: { name: 'DUP16', minimumGas: 3, implementation: (stack: bigint[]) => [ ...dupN(16, stack) ]},
 };
 
 const MAX_UINT256 = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // 2^256 - 1
@@ -330,4 +348,8 @@ function ceilBigInt(n: bigint): bigint {
   if (delta != 0n) return n + delta;
   // otherwise simply return the number
   return n;
+}
+
+function dupN(n: number, stack: bigint[]): bigint[] {
+  return [stack[stack.length - n]];
 }

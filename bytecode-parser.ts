@@ -16,7 +16,7 @@ type Result = {
 
 export function evm(bytecode:string): Result {
 
-  const stack: bigint[] = [];
+  const stack: bigint[] = []; // last index of array is TOP of stack;
   const trace: any[] = [];
 
   for (let counter = 0; counter < bytecode.length; ) {
@@ -50,6 +50,18 @@ export function evm(bytecode:string): Result {
       }
 
       stack.push(pushArgs);
+      continue;
+    }
+
+    if (opcode >= 0x80 && opcode <= 0x8F) { // DUP range
+      if (stack.length == 1024) {
+        console.log("Stack overflow");
+        return { success: false, stack: stack.reverse(), trace };
+      }
+
+      // @ts-expect-error DUP range has implementation, soon push will too;
+      const duplicatedValue = instructions[opcode].implementation(stack);
+      stack.push(...duplicatedValue); // it's only one value, but inside an arrray so the ...; array used for consistency with other opcodes' implementation's return values
       continue;
     }
 

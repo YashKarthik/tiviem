@@ -11,7 +11,7 @@ for (const t of tests as any) {
     const result = evm(t.code.bin);
 
     expect(result.success).toEqual(t.expect.success);
-    if (!result.stack) console.log(result.trace);
+    if (t.name == "DUP3") console.log(result.trace);
     expect(result.stack).toEqual(t.expect.stack.map((item:any) => BigInt(item)));
   });
 }
