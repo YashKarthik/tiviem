@@ -53,7 +53,11 @@ export function evm(bytecode:string): Result {
       continue;
     }
 
-    if (opcode >= 0x80 && opcode <= 0x8F) { // DUP range
+    if (opcode >= 0x80 && opcode <= 0x8F) {
+      /**
+        * 0x80 - 0x8f: DUP range
+        * The implementation function takes in the actual stack and returns the duplicated value for the DUP-N
+        */
       if (stack.length == 1024) {
         console.log("Stack overflow");
         return { success: false, stack: stack.reverse(), trace };
@@ -65,7 +69,13 @@ export function evm(bytecode:string): Result {
       continue;
     }
 
-    if (opcode >= 0x90 && opcode <= 0x9F) { // SWAP range
+    if (opcode >= 0x90 && opcode <= 0x9F) {
+      /**
+        * 0x90 - 0x9f: SWAP range
+        * The implementation function takes in the actual stack and MUTATES it,
+        * swapping the values in-place.
+        */
+
       // @ts-expect-error SWAP range has implementation, soon push will too;
       instructions[opcode].implementation(stack);
       continue;
