@@ -208,6 +208,20 @@ export const instructions = {
     implementation: (a: bigint) => [BigInt.asUintN(256, ~a)]
   },
 
+  0x1a: {
+    name: 'BYTE',
+    minimumGas: 3,
+    implementation: (i: bigint, x: bigint) => {
+      const hexString = x.toString(16).padStart(64, "0"); // ensures the stack input is 32-bytes (64 chars) long;
+      const bytesArray = new Uint8Array(
+        (hexString.match(/../g) || [])
+        .map((byte) => parseInt(byte, 16))
+      );
+
+      return [ BigInt(bytesArray[Number(i)] || 0 ) ]; // don't worry about Number(i) safety; || 0 to account for out of range byte offset
+    }
+  },
+
   0x1b: {
     name: 'SHL',
     minimumGas: 3,
@@ -248,6 +262,7 @@ export const instructions = {
       return [ BigInt.asUintN(256,  temp | mask)];
     }
   },
+
 
   // STACK MANIPULATION
   0x50: {
