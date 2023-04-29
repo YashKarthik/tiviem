@@ -16,7 +16,7 @@ type Result = {
 
 export function evm(bytecode:string): Result {
 
-  const stack: bigint[] = []; // last index of array is TOP of stack;
+  let stack: bigint[] = []; // last index of array is TOP of stack;
   const trace: any[] = [];
 
   for (let counter = 0; counter < bytecode.length; ) {
@@ -30,75 +30,16 @@ export function evm(bytecode:string): Result {
     }
     counter += 2;
 
-    if (opcode == 0x00) return { success: true, stack: stack.reverse(), trace };
-    if (opcode >= 0x5F && opcode <= 0x7F) { // PUSH range
-      if (opcode == 0x5F) { // PUSH0, does not read args from bytecode;
-        const result = instructions[opcode].implementation();
-        stack.push(...result);
-        continue;
-      }
-
-      const numberOfArgs = parseInt(instructions[opcode].name.slice(4,)); // we get the number of bytes, to be read, from name; eg: PUSH1 => 1 byte
-      const pushArgs = BigInt("0x" + bytecode.slice(counter, counter+numberOfArgs*2)); // We read numberOfArgs bytes from the bytocode; *2 as each byte = 2 characters in hex
-      counter += numberOfArgs*2; // *2 cuz above
-
-      trace.push("0x" + opcode.toString(16) + instructions[opcode].name + "0x" + pushArgs.toString(16));
-
-      if (stack.length == 1024) {
-        console.log("Stack overflow");
-        return { success: false, stack: stack.reverse(), trace };
-      }
-
-      stack.push(pushArgs);
-      continue;
+    const result = instructions[opcode].implementation({ stack, bytecode, counter });
+    if (result.error) return {
+      success: false,
+      stack,
+      trace
     }
 
-    if (opcode >= 0x80 && opcode <= 0x8F) {
-      /**
-        * 0x80 - 0x8f: DUP range
-        * The implementation function takes in the actual stack and returns the duplicated value for the DUP-N
-        */
-      if (stack.length == 1024) {
-        console.log("Stack overflow");
-        return { success: false, stack: stack.reverse(), trace };
-      }
-
-      // @ts-expect-error DUP range has implementation, soon push will too;
-      const duplicatedValue = instructions[opcode].implementation(stack);
-      stack.push(...duplicatedValue); // it's only one value, but inside an arrray so the ...; array used for consistency with other opcodes' implementation's return values
-      continue;
-    }
-
-    if (opcode >= 0x90 && opcode <= 0x9F) {
-      /**
-        * 0x90 - 0x9f: SWAP range
-        * The implementation function takes in the actual stack and MUTATES it,
-        * swapping the values in-place.
-        */
-
-      // @ts-expect-error SWAP range has implementation, soon push will too;
-      instructions[opcode].implementation(stack);
-      continue;
-    }
-
-    // @ts-expect-error This section runs only when out of PUSH range.
-    const stackInputLength = instructions[opcode].implementation.length; // read these many words from stack
-    const stackInput: bigint[] = [];
-    for (let inputNum = 0; inputNum < stackInputLength; inputNum++) {
-      const input = stack.pop();
-      if (input == undefined) {
-        console.log("Stack underflow.");
-        return { success: false, stack: stack.reverse(), trace };
-      }
-
-      stackInput.push(input);
-    }
-
-    trace.push("0x" + opcode.toString(16) + instructions[opcode].name + + stackInput.map(s => "0x" + s.toString(16)));
-
-    // @ts-expect-error This section runs only when out of PUSH range.
-    const result = instructions[opcode].implementation(...(stackInput as [bigint, bigint]));
-    stack.push(...result);
+    stack = result.stack;
+    counter = result.counter;
+    if (!result.continueExecution) break;
   }
 
   console.log("Final stack:", stack.map(s => "0x" + s.toString(16)));
