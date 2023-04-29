@@ -24,13 +24,12 @@ export function evm(bytecode: Uint8Array): Result {
     trace.push("Stack:" + stack);
 
     const opcode = (bytecode.slice(counter, counter + 1)[0]) as keyof typeof instructions;
-    counter += 1;
-
     console.log("Opcode:", "0x" + opcode.toString(16), instructions[opcode].name, stack);
+
     const result = instructions[opcode].implementation({ stack, bytecode, counter });
     if (result.error) return {
       success: false,
-      stack,
+      stack: stack.reverse(),
       trace
     }
 
