@@ -6,7 +6,7 @@
 
 type InstructionInput = {
   stack: readonly bigint[],
-  bytecode: string,
+  bytecode: Uint8Array,
   counter: number
 }
 
@@ -1959,25 +1959,6 @@ export const instructions: { [key: number]: Instruction } = {
 
 const MAX_UINT256 = BigInt("0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"); // 2^256 - 1
 
-function floorBigInt(n: bigint): bigint {
-  let msd = n & -(1n << 53n); // get the most significant digit
-  let delta = msd & (1n << 53n) - 1n; // get the lower 53 bits
-
-  if (delta != 0n) return n - delta;
-  // otherwise simply return the number
-  return n;
-}
-
-function ceilBigInt(n: bigint): bigint {
-  let msd = n & -(1n << 53n);
-  let delta = msd & (1n << 53n) - 1n;
-
-  // if the delta bit is set, the number is negative, so add delta
-  if (delta != 0n) return n + delta;
-  // otherwise simply return the number
-  return n;
-}
-
 function dupN(n: number, stack: readonly bigint[]): bigint {
   return stack[stack.length - n];
 }
@@ -1990,9 +1971,13 @@ function swapN(n: number, stack: bigint[]) {
   stack.splice( stack.length - 1, 1, b);
 }
 
-function pushN(n: number, counter: number, bytecode: string) {
-  const valueToBePushed = BigInt("0x" + bytecode.slice(counter, counter + n*2));
-  counter += n*2;
+function pushN(n: number, counter: number, bytecode: Uint8Array) {
+  const bytesToBePushed = bytecode.slice(counter, counter + n);
+  let byteString = "0x"
+  bytesToBePushed.forEach(byte => byteString = byteString + byte.toString(16));
+
+  const valueToBePushed = BigInt(byteString);
+  counter += n;
 
   return {
     counter,
