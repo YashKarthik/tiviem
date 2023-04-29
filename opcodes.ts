@@ -761,7 +761,44 @@ export const instructions: { [key: number]: Instruction } = {
         error: "Stack underflow"
       }
 
-      console.log(getValidJumpDests(bytecode))
+      if (getValidJumpDests(bytecode)[jumpDest] != 1) return {
+        stack: [],
+        counter: counter+1,
+        continueExecution: false,
+        error: "Invalid JUMP."
+      }
+
+      return {
+        stack: [ ...tempStack ],
+        counter: Number(jumpDest),
+        continueExecution: true,
+        error: null
+      }
+    }
+  },
+  0x57: {
+    name: 'JUMPI',
+    minimumGas: 8,
+    implementation: ({ counter, stack, bytecode }) => {
+      const tempStack = [...stack]
+      const jumpDest = Number(tempStack.pop());
+      const b = Number(tempStack.pop());
+
+      if (!(typeof jumpDest == "number" && typeof b == "number")) return {
+        stack: [],
+        counter: counter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      if (b == 0) return {
+        stack: [],
+        counter: counter+1,
+        continueExecution: true,
+        error: null
+      }
+      console.log("continuing")
+
       if (getValidJumpDests(bytecode)[jumpDest] != 1) return {
         stack: [],
         counter: counter+1,

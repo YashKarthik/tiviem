@@ -30,10 +30,14 @@ export function evm(bytecode: Uint8Array): Result {
     stack = result.stack;
     counter = result.counter;
 
-    if (result.error) return {
-      success: false,
-      stack: stack.reverse(),
-      trace
+    if (result.error) {
+      console.log("---------- Fatal Error ----------");
+      console.log(result.error);
+      return {
+        success: false,
+        stack: stack.reverse(),
+        trace
+      }
     }
     if (!result.continueExecution) break;
   }
