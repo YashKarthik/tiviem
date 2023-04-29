@@ -747,6 +747,37 @@ export const instructions: { [key: number]: Instruction } = {
     }),
   },
 
+  0x56: {
+    name: 'JUMP',
+    minimumGas: 8,
+    implementation: ({ counter, stack, bytecode }) => {
+      const tempStack = [...stack]
+      const jumpDest = Number(tempStack.pop());
+
+      if (typeof jumpDest != "number") return {
+        stack: [],
+        counter: counter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      console.log(getValidJumpDests(bytecode))
+      if (getValidJumpDests(bytecode)[jumpDest] != 1) return {
+        stack: [],
+        counter: counter+1,
+        continueExecution: false,
+        error: "Invalid JUMP."
+      }
+
+      return {
+        stack: [ ...tempStack ],
+        counter: Number(jumpDest),
+        continueExecution: true,
+        error: null
+      }
+    }
+  },
+
   0x58: {
     name: 'PC',
     minimumGas: 2,
@@ -756,6 +787,17 @@ export const instructions: { [key: number]: Instruction } = {
       continueExecution: true,
       error: null
     })
+  },
+
+  0x5B: {
+    name: 'JUMPDEST',
+    minimumGas: 1,
+    implementation: ({ stack, counter }) => ({
+      counter: counter+1,
+      stack: [ ...stack ],
+      error: null,
+      continueExecution: true
+    }),
   },
 
   //// 0x5F - 0x7F: PUSH range.
@@ -1985,4 +2027,25 @@ function pushN(n: number, counter: number, bytecode: Uint8Array) {
     counter,
     value: valueToBePushed
   }
+}
+
+function getValidJumpDests(code: Uint8Array) {
+  const jumps = new Uint8Array(code.length).fill(0)
+
+  for (let i = 0; i < code.length; i++) {
+    const opcode = code[i]
+    // skip over PUSH0-32 since no jump destinations in the middle of a push block
+    if (opcode <= 0x7f) {
+      if (opcode >= 0x60) {
+        i += opcode - 0x5f
+      } else if (opcode === 0x5b) {
+        // Define a JUMPDEST as a 1 in the valid jumps array
+        jumps[i] = 1
+      } else if (opcode === 0x5c) {
+        // Define a BEGINSUB as a 2 in the valid jumps array
+        jumps[i] = 2
+      }
+    }
+  }
+  return jumps
 }

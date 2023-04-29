@@ -27,14 +27,14 @@ export function evm(bytecode: Uint8Array): Result {
     console.log("Opcode:", "0x" + opcode.toString(16), instructions[opcode].name, stack);
 
     const result = instructions[opcode].implementation({ stack, bytecode, counter });
+    stack = result.stack;
+    counter = result.counter;
+
     if (result.error) return {
       success: false,
       stack: stack.reverse(),
       trace
     }
-
-    stack = result.stack;
-    counter = result.counter;
     if (!result.continueExecution) break;
   }
 
