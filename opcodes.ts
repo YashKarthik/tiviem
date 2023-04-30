@@ -4,8 +4,12 @@
   * The math needs to be fixed to replicate EVM errors / edgecases.
   **/
 
+import { fail } from "assert";
+import { hexStringToUint8Array } from "./evm.test";
+
 type InstructionInput = {
   stack: readonly bigint[],
+  memory: Uint8Array,
   bytecode: Uint8Array,
   counter: number
 }
@@ -15,6 +19,7 @@ type InstructionOutput = {
   counter: number,
   continueExecution: boolean
   error: string | null,
+  memory?: Uint8Array,
 }
 
 interface Instruction {
@@ -745,6 +750,62 @@ export const instructions: { [key: number]: Instruction } = {
       error: null,
       continueExecution: true
     }),
+  },
+
+  0x51: {
+    name: 'MLOAD',
+    minimumGas: 3,
+    implementation: ({ stack, counter, memory }) => {
+      const tempStack = [...stack];
+      const offset = tempStack.pop();
+
+      if (typeof offset != "bigint") return {
+        stack: tempStack,
+        counter: counter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      const bytesToBePushed = memory.slice(Number(offset), 32)
+      const byteString = uint8ArrayToByteString(bytesToBePushed);
+      tempStack.push(BigInt(byteString));
+
+      return {
+        stack: tempStack,
+        memory: memory,
+        counter: counter+1,
+        continueExecution: true,
+        error: null
+      }
+    },
+  },
+  0x52: {
+    name: 'MSTORE',
+    minimumGas: 3,
+    implementation: ({ stack, counter, memory }) => {
+      const tempStack = [...stack];
+      const tempMemory = memory.slice();
+      const offset = tempStack.pop();
+      const value = tempStack.pop();
+
+      if (!(typeof offset == "bigint" && typeof value == "bigint")) return {
+        stack: tempStack,
+        counter: counter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      const valueByteArray = hexStringToUint8Array(value.toString(16).padStart(64, "0"));
+      tempMemory.set(valueByteArray, Number(offset));
+
+      return {
+        stack: tempStack,
+        memory: tempMemory,
+        counter: counter+1,
+        continueExecution: true,
+        error: null
+      }
+    },
   },
 
   0x56: {
@@ -2054,8 +2115,7 @@ function swapN(n: number, stack: bigint[]) {
 function pushN(n: number, counter: number, bytecode: Uint8Array) {
   counter += 1;
   const bytesToBePushed = bytecode.slice(counter, counter+n);
-  let byteString = "0x"
-  bytesToBePushed.forEach(byte => byteString = byteString + byte.toString(16).padStart(2, "0"));
+  let byteString = uint8ArrayToByteString(bytesToBePushed);
 
   const valueToBePushed = BigInt(byteString);
   counter += n;
@@ -2085,4 +2145,10 @@ function getValidJumpDests(code: Uint8Array) {
     }
   }
   return jumps
+}
+
+function uint8ArrayToByteString(bytesArr:Uint8Array): string {
+  let byteString = "0x";
+  bytesArr.forEach(byte => byteString = byteString + byte.toString(16).padStart(2, "0"));
+  return byteString;
 }

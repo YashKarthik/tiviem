@@ -18,6 +18,7 @@ type Result = {
 export function evm(bytecode: Uint8Array): Result {
 
   let stack: bigint[] = []; // last index of array is TOP of stack;
+  let memory: Uint8Array = new Uint8Array(1024);
   const trace: any[] = [];
 
   for (let counter = 0; counter < bytecode.length; ) {
@@ -26,9 +27,11 @@ export function evm(bytecode: Uint8Array): Result {
     const opcode = (bytecode.slice(counter, counter + 1)[0]) as keyof typeof instructions;
     console.log("Opcode:", "0x" + opcode.toString(16), instructions[opcode].name, stack);
 
-    const result = instructions[opcode].implementation({ stack, bytecode, counter });
+    const result = instructions[opcode].implementation({ stack, bytecode, counter, memory });
     stack = result.stack;
     counter = result.counter;
+
+    if (result.memory) memory = result.memory;
 
     if (result.error) {
       console.log("---------- Fatal Error ----------");
