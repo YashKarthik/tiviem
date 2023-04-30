@@ -766,7 +766,7 @@ export const instructions: { [key: number]: Instruction } = {
         error: "Stack underflow"
       }
 
-      const bytesToBePushed = memory.slice(Number(offset), 32)
+      const bytesToBePushed = memory.slice(Number(offset), Number(offset)+32)
       const byteString = uint8ArrayToByteString(bytesToBePushed);
       tempStack.push(BigInt(byteString));
 
@@ -796,6 +796,34 @@ export const instructions: { [key: number]: Instruction } = {
       }
 
       const valueByteArray = hexStringToUint8Array(value.toString(16).padStart(64, "0"));
+      tempMemory.set(valueByteArray, Number(offset));
+
+      return {
+        stack: tempStack,
+        memory: tempMemory,
+        counter: counter+1,
+        continueExecution: true,
+        error: null
+      }
+    },
+  },
+  0x53: {
+    name: 'MSTORE8',
+    minimumGas: 3,
+    implementation: ({ stack, counter, memory }) => {
+      const tempStack = [...stack];
+      const tempMemory = memory.slice();
+      const offset = tempStack.pop();
+      const value = tempStack.pop();
+
+      if (!(typeof offset == "bigint" && typeof value == "bigint")) return {
+        stack: tempStack,
+        counter: counter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      const valueByteArray = hexStringToUint8Array(value.toString(16).padStart(2, "0"));
       tempMemory.set(valueByteArray, Number(offset));
 
       return {
@@ -2147,8 +2175,8 @@ function getValidJumpDests(code: Uint8Array) {
   return jumps
 }
 
-function uint8ArrayToByteString(bytesArr:Uint8Array): string {
+export function uint8ArrayToByteString(bytesArr:Uint8Array): string {
   let byteString = "0x";
-  bytesArr.forEach(byte => byteString = byteString + byte.toString(16).padStart(2, "0"));
+  bytesArr.forEach(byte => byteString = byteString + byte.toString(16).padStart(2, "0").padEnd(2, "0"));
   return byteString;
 }

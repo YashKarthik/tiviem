@@ -1,5 +1,5 @@
 import { hexStringToUint8Array } from "./evm.test";
-import { instructions } from "./opcodes";
+import { instructions, uint8ArrayToByteString } from "./opcodes";
 
 try {
   const bytecode = process.argv.slice(2,)[0].slice(2,); // the first slice gets us the passed cmd-line arg, the second slice is to get rid of the 0x
@@ -25,6 +25,8 @@ export function evm(bytecode: Uint8Array): Result {
     trace.push("Stack:" + stack);
 
     const opcode = (bytecode.slice(counter, counter + 1)[0]) as keyof typeof instructions;
+
+    if (memory != (new Uint8Array(1024))) console.log("Memory:", uint8ArrayToByteString(memory));
     console.log("Opcode:", "0x" + opcode.toString(16), instructions[opcode].name, stack);
 
     const result = instructions[opcode].implementation({ stack, bytecode, counter, memory });
