@@ -4,7 +4,6 @@
   * The math needs to be fixed to replicate EVM errors / edgecases.
   **/
 
-import { fail } from "assert";
 import { hexStringToUint8Array } from "./evm.test";
 
 type InstructionInput = {
@@ -767,12 +766,26 @@ export const instructions: { [key: number]: Instruction } = {
       }
 
       const bytesToBePushed = memory.slice(Number(offset), Number(offset)+32)
-      const byteString = uint8ArrayToByteString(bytesToBePushed);
-      tempStack.push(BigInt(byteString));
+
+      if (bytesToBePushed.length == 32) {
+        const byteString = uint8ArrayToByteString(bytesToBePushed);
+        tempStack.push(BigInt(byteString));
+
+        return {
+          stack: tempStack,
+          memory: memory,
+          counter: counter+1,
+          continueExecution: true,
+          error: null
+        }
+      }
+
+      const { memory: tempMemory } = expandMemory(memory);
+      tempStack.push(BigInt(uint8ArrayToByteString(tempMemory.slice(Number(offset), Number(offset)+32))));
 
       return {
         stack: tempStack,
-        memory: memory,
+        memory: tempMemory,
         counter: counter+1,
         continueExecution: true,
         error: null
@@ -784,7 +797,6 @@ export const instructions: { [key: number]: Instruction } = {
     minimumGas: 3,
     implementation: ({ stack, counter, memory }) => {
       const tempStack = [...stack];
-      const tempMemory = memory.slice();
       const offset = tempStack.pop();
       const value = tempStack.pop();
 
@@ -796,11 +808,11 @@ export const instructions: { [key: number]: Instruction } = {
       }
 
       const valueByteArray = hexStringToUint8Array(value.toString(16).padStart(64, "0"));
-      tempMemory.set(valueByteArray, Number(offset));
+      const { memory: memoryWithNewValue} = setMemorySafely(memory, Number(offset), valueByteArray);
 
       return {
         stack: tempStack,
-        memory: tempMemory,
+        memory: memoryWithNewValue,
         counter: counter+1,
         continueExecution: true,
         error: null
@@ -812,7 +824,6 @@ export const instructions: { [key: number]: Instruction } = {
     minimumGas: 3,
     implementation: ({ stack, counter, memory }) => {
       const tempStack = [...stack];
-      const tempMemory = memory.slice();
       const offset = tempStack.pop();
       const value = tempStack.pop();
 
@@ -824,11 +835,11 @@ export const instructions: { [key: number]: Instruction } = {
       }
 
       const valueByteArray = hexStringToUint8Array(value.toString(16).padStart(2, "0"));
-      tempMemory.set(valueByteArray, Number(offset));
+      const { memory: memoryWithNewValue } = setMemorySafely(memory, Number(offset), valueByteArray);
 
       return {
         stack: tempStack,
-        memory: tempMemory,
+        memory: memoryWithNewValue,
         counter: counter+1,
         continueExecution: true,
         error: null
@@ -909,6 +920,17 @@ export const instructions: { [key: number]: Instruction } = {
     minimumGas: 2,
     implementation: ({ counter, stack }) => ({
       stack: [ ...stack, BigInt(counter) ],
+      counter: counter+1,
+      continueExecution: true,
+      error: null
+    })
+  },
+
+  0x59: {
+    name: 'MSIZE',
+    minimumGas: 2,
+    implementation: ({ counter, stack, memory }) => ({
+      stack: [ ...stack, BigInt(memory.length) ],
       counter: counter+1,
       continueExecution: true,
       error: null
@@ -2179,4 +2201,42 @@ export function uint8ArrayToByteString(bytesArr:Uint8Array): string {
   let byteString = "0x";
   bytesArr.forEach(byte => byteString = byteString + byte.toString(16).padStart(2, "0").padEnd(2, "0"));
   return byteString;
+}
+
+function setMemorySafely(memory: Uint8Array, offset:number, valueByteArray: Uint8Array): { memory: Uint8Array, additionGas: number } {
+  let tempMemory = memory.slice(0,);
+  
+  try {
+    tempMemory.set(valueByteArray,);
+    return {
+      memory: tempMemory,
+      additionGas: 0
+    };
+  } catch (e) {
+    const result = expandMemory(tempMemory);
+    tempMemory = result.memory;
+    tempMemory.set(valueByteArray, Number(offset));
+
+    return {
+      memory: tempMemory,
+      additionGas: result.gasCost
+    };
+  }
+}
+
+function expandMemory(prevMemory:Uint8Array): { memory: Uint8Array, gasCost: number } {
+  const gasCost = memoryExpansionCost(prevMemory.length + 32) - memoryExpansionCost(prevMemory.length);
+
+  const newMemory = new Uint8Array(prevMemory.length + 32);
+  newMemory.set(prevMemory);
+
+  return {
+    memory: newMemory,
+    gasCost
+  }
+}
+
+function memoryExpansionCost(numOfBytes:number): number {
+  const numOfWords = (numOfBytes + 31) / 32;
+  return Math.floor(numOfWords**2 / 512) + numOfWords*3
 }
