@@ -780,8 +780,8 @@ export const instructions: { [key: number]: Instruction } = {
         }
       }
 
-      const { memory: tempMemory } = expandMemory(memory);
-      tempStack.push(BigInt(uint8ArrayToByteString(tempMemory.slice(Number(offset), Number(offset)+32))));
+      const { memory: tempMemory } = expandMemory(memory, Number(offset)+32);
+      tempStack.push(BigInt(uint8ArrayToByteString(tempMemory.slice(Number(offset), Number(offset)+32)).padEnd(64, "0")));
 
       return {
         stack: tempStack,
@@ -2213,7 +2213,7 @@ function setMemorySafely(memory: Uint8Array, offset:number, valueByteArray: Uint
       additionGas: 0
     };
   } catch (e) {
-    const result = expandMemory(tempMemory);
+    const result = expandMemory(tempMemory, offset + valueByteArray.length);
     tempMemory = result.memory;
     tempMemory.set(valueByteArray, Number(offset));
 
@@ -2224,10 +2224,11 @@ function setMemorySafely(memory: Uint8Array, offset:number, valueByteArray: Uint
   }
 }
 
-function expandMemory(prevMemory:Uint8Array): { memory: Uint8Array, gasCost: number } {
-  const gasCost = memoryExpansionCost(prevMemory.length + 32) - memoryExpansionCost(prevMemory.length);
+function expandMemory(prevMemory:Uint8Array, newLength: number): { memory: Uint8Array, gasCost: number } {
+  const newMemoryLength = Math.ceil((prevMemory.length + newLength) / 32) * 32;
+  const gasCost = memoryExpansionCost(newMemoryLength) - memoryExpansionCost(prevMemory.length);
 
-  const newMemory = new Uint8Array(prevMemory.length + 32);
+  const newMemory = new Uint8Array(newMemoryLength);
   newMemory.set(prevMemory);
 
   return {
