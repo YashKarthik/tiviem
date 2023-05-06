@@ -5,10 +5,12 @@
   **/
 
 import { hexStringToUint8Array } from "./evm.test";
+import { keccak256 } from "ethereum-cryptography/keccak";
 
 type InstructionInput = {
   stack: readonly bigint[],
   memory: Uint8Array,
+  gas: number,
   bytecode: Uint8Array,
   counter: number
 }
@@ -19,6 +21,7 @@ type InstructionOutput = {
   continueExecution: boolean
   error: string | null,
   memory?: Uint8Array,
+  additionalGas?: number,
 }
 
 interface Instruction {
@@ -732,10 +735,39 @@ export const instructions: { [key: number]: Instruction } = {
       return {
         stack: [ ...tempStack, BigInt.asUintN(256,  temp | mask) ],
         counter: counter+1,
-        continueExecution: false,
+        continueExecution: true,
         error: null
       }
     }
+  },
+
+  0x20: {
+    name: 'SHA3',
+    minimumGas: 30,
+    implementation: ({ stack, counter, memory }) => {
+      const tempStack = [...stack];
+      const tempMemory = memory.slice();
+
+      const offset = tempStack.pop();
+      const byteSize = tempStack.pop();
+      if (!(typeof offset == "bigint" && typeof byteSize == "bigint")) return {
+        stack: [ ...tempStack ],
+        counter: counter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      const toHash = memory.slice(Number(offset), Number(offset+byteSize));
+      const hash = BigInt(uint8ArrayToByteString(keccak256(toHash)));
+
+      return {
+        stack: [ ...tempStack, hash ],
+        counter: counter+1,
+        continueExecution: true,
+        error: null
+      }
+
+    },
   },
 
 
@@ -808,11 +840,12 @@ export const instructions: { [key: number]: Instruction } = {
       }
 
       const valueByteArray = hexStringToUint8Array(value.toString(16).padStart(64, "0"));
-      const { memory: memoryWithNewValue} = setMemorySafely(memory, Number(offset), valueByteArray);
+      const result = setMemorySafely(memory, Number(offset), valueByteArray);
 
       return {
         stack: tempStack,
-        memory: memoryWithNewValue,
+        memory: result.memory,
+        additionalGas: result.additionalGas,
         counter: counter+1,
         continueExecution: true,
         error: null
@@ -835,11 +868,12 @@ export const instructions: { [key: number]: Instruction } = {
       }
 
       const valueByteArray = hexStringToUint8Array(value.toString(16).padStart(2, "0"));
-      const { memory: memoryWithNewValue } = setMemorySafely(memory, Number(offset), valueByteArray);
+      const result = setMemorySafely(memory, Number(offset), valueByteArray);
 
       return {
         stack: tempStack,
-        memory: memoryWithNewValue,
+        memory: result.memory,
+        additionalGas: result.additionalGas,
         counter: counter+1,
         continueExecution: true,
         error: null
@@ -935,6 +969,27 @@ export const instructions: { [key: number]: Instruction } = {
       continueExecution: true,
       error: null
     })
+  },
+  0x5a: {
+    name: 'GAS',
+    minimumGas: 2,
+    implementation: ({ counter, stack, gas }) => {
+      const remainingGas = gas - 2; // remaining gas after this instruction;
+
+      if (remainingGas < 0) return {
+        stack: [ ...stack ],
+        counter: counter+1,
+        continueExecution: false,
+        error: "Out of gas."
+      }
+
+      return {
+        stack: [ ...stack, BigInt(remainingGas) ],
+        counter: counter+1,
+        continueExecution: true,
+        error: null
+      }
+    }
   },
 
   0x5B: {
@@ -2203,14 +2258,14 @@ export function uint8ArrayToByteString(bytesArr:Uint8Array): string {
   return byteString;
 }
 
-function setMemorySafely(memory: Uint8Array, offset:number, valueByteArray: Uint8Array): { memory: Uint8Array, additionGas: number } {
+function setMemorySafely(memory: Uint8Array, offset:number, valueByteArray: Uint8Array): { memory: Uint8Array, additionalGas: number } {
   let tempMemory = memory.slice(0,);
   
   try {
     tempMemory.set(valueByteArray,);
     return {
       memory: tempMemory,
-      additionGas: 0
+      additionalGas: 0
     };
   } catch (e) {
     const result = expandMemory(tempMemory, offset + valueByteArray.length);
@@ -2219,7 +2274,7 @@ function setMemorySafely(memory: Uint8Array, offset:number, valueByteArray: Uint
 
     return {
       memory: tempMemory,
-      additionGas: result.gasCost
+      additionalGas: result.gasCost
     };
   }
 }
