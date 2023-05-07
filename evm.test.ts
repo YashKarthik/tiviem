@@ -15,9 +15,16 @@ for (const t of tests as any) {
     console.log("Test bytecode: 0x"+t.code.bin);
     console.log("Test opcodes");
     console.log("\x1b[34m%s\x1b[0m", t.code.asm, "\n");
-    const result = evm(hexStringToUint8Array(t.code.bin));
+    const result = evm(hexStringToUint8Array(t.code.bin), 15_000_000);
 
     expect(result.success).toEqual(t.expect.success);
-    expect(result.stack).toEqual(t.expect.stack.map((item:any) => BigInt(item)));
+
+    if (t.expect.stack) {
+      expect(result.stack).toEqual(t.expect.stack.map((item:any) => BigInt(item)));
+    }
+
+    if (t.expect.return) {
+      expect(result.returndata).toEqual(BigInt("0x" + t.expect.return));
+    }
   });
 }

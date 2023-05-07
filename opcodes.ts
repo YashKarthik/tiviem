@@ -21,6 +21,7 @@ type InstructionOutput = {
   error: string | null,
   memory?: Uint8Array,
   additionalGas?: number,
+  returndata?: BigInt,
 }
 
 interface Instruction {
@@ -2184,6 +2185,48 @@ export const instructions: { [key: number]: Instruction } = {
         }
       }
     }
+  },
+
+  0xf3: {
+    name: 'RETURN',
+    minimumGas: 0,
+    implementation: ({ stack, counter, memory }) => {
+      const tempStack = [...stack];
+      const offset = tempStack.pop();
+      const size = tempStack.pop();
+
+      if (!(typeof offset == "bigint" && typeof size == "bigint")) return {
+        stack: tempStack,
+        counter: counter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      const bytesToBeReturned = memory.slice(Number(offset), Number(offset+size))
+
+      if (bytesToBeReturned.length == Number(size)) {
+        const byteString = uint8ArrayToByteString(bytesToBeReturned);
+
+        return {
+          stack: tempStack,
+          memory: memory,
+          returndata: BigInt(byteString),
+          counter: counter+1,
+          continueExecution: false,
+          error: null
+        }
+      }
+      const { memory: returnData } = expandMemory(memory, Number(offset)+32);
+
+      return {
+        stack: tempStack,
+        memory: memory,
+        counter: counter+1,
+        returndata: BigInt(uint8ArrayToByteString(returnData.slice(Number(offset), Number(offset+size))).padEnd(64, "0")),
+        continueExecution: false,
+        error: null
+      }
+    },
   },
 
   0xfe: {
