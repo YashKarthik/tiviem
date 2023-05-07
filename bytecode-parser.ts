@@ -1,33 +1,18 @@
-import { hexStringToUint8Array } from "./evm.test";
-import { instructions, uint8ArrayToByteString } from "./opcodes";
-
-try {
-  const bytecode = process.argv.slice(2,)[0].slice(2,); // the first slice gets us the passed cmd-line arg, the second slice is to get rid of the 0x
-  if (!bytecode) console.log("No bytecode given.");
-  evm(hexStringToUint8Array(bytecode));
-} catch {
-
-}
+import { instructions } from "./opcodes";
 
 type Result = {
   success: boolean,
   stack: bigint[],
-  trace: any[]
 }
 
-export function evm(bytecode: Uint8Array): Result {
+export function evm(bytecode: Uint8Array, gas: number): Result {
 
   let stack: bigint[] = []; // last index of array is TOP of stack;
   let memory: Uint8Array = new Uint8Array(0);
-  let gas = 15_000_000;
-  const trace: any[] = [];
 
   for (let counter = 0; counter < bytecode.length; ) {
-    trace.push("Stack:" + stack);
-
     const opcode = (bytecode.slice(counter, counter + 1)[0]) as keyof typeof instructions;
 
-    console.log("Opcode:", "0x" + opcode.toString(16), instructions[opcode].name, stack);
 
     const result = instructions[opcode].implementation({ stack, bytecode, counter, memory, gas });
     stack = result.stack;
@@ -41,8 +26,12 @@ export function evm(bytecode: Uint8Array): Result {
     if (gas < 0) return {
       success: false,
       stack: stack.reverse(),
-      trace
     }
+
+    console.log("\x1b[33m%s\x1b[0m", "0x" + opcode.toString(16), "\x1b[37m%s\x1b[0m", instructions[opcode].name + " @ ", "\x1b[33m%s\x1b[0m", "PC=" + counter);
+    console.log("Stack:", stack);
+    console.log("Memory:", memory);
+    console.log("gas:", gas, "\n");
 
     if (result.error) {
       console.log("---------- Fatal Error ----------");
@@ -50,12 +39,11 @@ export function evm(bytecode: Uint8Array): Result {
       return {
         success: false,
         stack: stack.reverse(),
-        trace
       }
     }
     if (!result.continueExecution) break;
   }
 
   console.log("Final stack:", stack.map(s => "0x" + s.toString(16)));
-  return { success: true, stack: stack.reverse(), trace };
+  return { success: true, stack: stack.reverse() };
 }

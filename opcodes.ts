@@ -4,7 +4,6 @@
   * The math needs to be fixed to replicate EVM errors / edgecases.
   **/
 
-import { hexStringToUint8Array } from "./evm.test";
 import { keccak256 } from "ethereum-cryptography/keccak";
 
 type InstructionInput = {
@@ -2295,4 +2294,10 @@ function expandMemory(prevMemory:Uint8Array, newLength: number): { memory: Uint8
 function memoryExpansionCost(numOfBytes:number): number {
   const numOfWords = (numOfBytes + 31) / 32;
   return Math.floor(numOfWords**2 / 512) + numOfWords*3
+}
+
+export function hexStringToUint8Array(hexString: string): Uint8Array {
+  return new Uint8Array(
+    (hexString?.match(/../g) || []).map((byte) => parseInt(byte, 16))
+  );
 }
