@@ -8,6 +8,25 @@ type Result = {
   returndata: BigInt,
 }
 
+export interface Context {
+  address: bigint,
+  caller: bigint,
+  origin: bigint,
+  gasPrice: bigint,
+  gasLeft: number,
+  callValue: bigint
+  callData: Uint8Array
+
+  bytecode: Uint8Array,
+
+  block: Block,
+  state: Map<bigint, State>, // address -> State
+}
+
+export type State = {
+  balance: bigint,
+}
+
 type Block = {
   basefee: bigint,
   coinbase: bigint,
@@ -16,25 +35,6 @@ type Block = {
   difficulty: bigint,
   gasLimit: bigint,
   chainId: bigint,
-}
-
-export interface Context {
-  address: bigint,
-  caller: bigint,
-  //callData: Uint8Array
-  //callValue: bigint
-  bytecode: Uint8Array,
-  //isStatic: boolean
-  //depth: number
-  gasPrice: bigint,
-  gasLeft: number,
-  origin: bigint,
-  block: Block
-  //contract: Account
-  //codeAddress: bigint         /* Different than address for DELEGATECALL and CALLCODE */
-  //gasRefund: bigint           /* Current value (at begin of the frame) of the gas refund */
-  //containerCode?: Uint8Array  /** Full container code for EOF1 contracts */
-  //versionedHashes: Buffer[]   /** Versioned hashes for blob transactions */
 }
 
 export interface RunState {
@@ -86,6 +86,7 @@ export function evm(context: Context): Result {
     console.log("\x1b[33m%s\x1b[0m", "0x" + runState.opcode.toString(16), "\x1b[37m%s\x1b[0m", instructions[runState.opcode].name + " @ ", "\x1b[33m%s\x1b[0m", "PC=" + runState.programCounter);
     console.log("Stack:", runState.stack);
     console.log("Memory:", runState.memory);
+    console.log("State:", runState.context.state);
     console.log("gas:", runState.context.gasLeft, "\n");
 
     if (result.error) {

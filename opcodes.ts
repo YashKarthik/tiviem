@@ -773,6 +773,29 @@ export const instructions: { [key: number]: Instruction } = {
     }),
   },
 
+  0x31: {
+    name: 'BALANCE',
+    minimumGas: 100,
+    implementation: ({ stack, programCounter, context: { state } }) => {
+      const tempStack = [...stack];
+      const address = tempStack.pop();
+
+      if (typeof address != "bigint") return {
+        programCounter: programCounter+1,
+        stack: [...tempStack],
+        error: "Stack underflow",
+        continueExecution: false
+      }
+
+      return {
+        programCounter: programCounter+1,
+        stack: [...tempStack, state.get(address)?.balance || 0n ],
+        error: null,
+        continueExecution: true
+      }
+    },
+  },
+
   0x32: {
     name: 'ORIGIN',
     minimumGas: 2,
@@ -793,6 +816,42 @@ export const instructions: { [key: number]: Instruction } = {
       error: null,
       continueExecution: true
     }),
+  },
+
+  0x34: {
+    name: 'CALLVALUE',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter, context: { callValue } }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, callValue],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
+  0x35: {
+    name: 'CALLDATALOAD',
+    minimumGas: 3,
+    implementation: ({ stack, programCounter, context: { callData } }) => {
+      const tempStack = [...stack];
+      const i = tempStack.pop();
+
+      if (typeof i != "bigint") return {
+        programCounter: programCounter+1,
+        stack: [...tempStack],
+        error: "Stack underflow",
+        continueExecution: false
+      }
+
+      const callDataByteString = uint8ArrayToByteString(callData.slice(Number(i), Number(i+32n))).padEnd(66, "0");
+
+      return {
+        programCounter: programCounter+1,
+        stack: [...tempStack, BigInt(callDataByteString)],
+        error: null,
+        continueExecution: true
+      }
+    },
   },
 
   0x3a: {
@@ -2424,7 +2483,7 @@ function getValidJumpDests(code: Uint8Array) {
 
 export function uint8ArrayToByteString(bytesArr:Uint8Array): string {
   let byteString = "0x";
-  bytesArr.forEach(byte => byteString = byteString + byte.toString(16).padStart(2, "0").padEnd(2, "0"));
+  bytesArr.forEach(byte => byteString = byteString + byte.toString(16).padStart(2, "0"));
   return byteString;
 }
 

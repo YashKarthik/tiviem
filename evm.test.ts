@@ -1,4 +1,4 @@
-import { Context, evm } from "./bytecode-parser";
+import { Context, evm, State } from "./bytecode-parser";
 import { expect, test } from "bun:test";
 import { hexStringToUint8Array } from "./opcodes";
 
@@ -16,13 +16,27 @@ for (const t of tests as any) {
     console.log("Test opcodes");
     console.log("\x1b[34m%s\x1b[0m", t.code.asm, "\n");
 
+    const worldState = new Map<bigint, State>();
+    if (t.state) {
+      const addresses = Object.keys(t.state);
+
+      addresses.forEach(address => {
+        worldState.set(BigInt(address), { balance: BigInt(t.state[address]["balance"])})
+      });
+
+    }
+
     const context: Context = {
       address: BigInt(t?.tx?.to || 0x00),
       caller: BigInt(t?.tx?.from || 0x00),
       origin: BigInt(t?.tx?.origin || 0x00),
-      bytecode: hexStringToUint8Array(t.code.bin),
+
+      callValue: BigInt(t?.tx?.value || 0n),
+      callData: hexStringToUint8Array(((t?.tx?.data || "00") as string).padEnd(64, "0")),
       gasPrice: BigInt(t?.tx?.gasprice || 0n),
       gasLeft: 15_000_000,
+
+      bytecode: hexStringToUint8Array(t.code.bin),
       block: {
         basefee: BigInt(t?.block?.basefee || 0n),
         coinbase: BigInt(t?.block?.coinbase || 0n),
@@ -31,7 +45,8 @@ for (const t of tests as any) {
         difficulty: BigInt(t?.block?.difficulty || 0n),
         gasLimit: BigInt(t?.block?.gaslimit || 0n),
         chainId: BigInt(t?.block?.chainid || 1n),
-      }
+      },
+      state: worldState,
     }
 
     const result = evm(context);
