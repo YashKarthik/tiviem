@@ -977,6 +977,31 @@ export const instructions: { [key: number]: Instruction } = {
     }),
   },
 
+  0x3b: {
+    name: 'EXTCODESIZE',
+    minimumGas: 100,
+    implementation: ({ stack, programCounter, context: { state } }) => {
+      const tempStack = [...stack];
+      const address = tempStack.pop();
+
+      if (typeof address != "bigint") return {
+        programCounter: programCounter+1,
+        stack: [...tempStack ],
+        error: "Stack underflow",
+        continueExecution: false
+      }
+
+      const codeSize = BigInt(state.get(address)?.code?.bin.length || 0);
+
+      return {
+        programCounter: programCounter+1,
+        stack: [...tempStack, codeSize ],
+        error: null,
+        continueExecution: true
+      }
+    },
+  },
+
   0x40: {
     name: 'BLOCKHASH',
     minimumGas: 20,
