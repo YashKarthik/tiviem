@@ -1002,6 +1002,95 @@ export const instructions: { [key: number]: Instruction } = {
     },
   },
 
+  0x3c: {
+    name: 'EXTCODECOPY',
+    minimumGas: 100,
+    implementation: ({ stack, programCounter, memory, context: { state } }) => {
+      const tempStack = [...stack];
+
+      const address = tempStack.pop();
+      const destOffset = tempStack.pop();
+      const offset = tempStack.pop();
+      const size = tempStack.pop();
+
+      if (!(typeof address == "bigint" && typeof destOffset == "bigint" && typeof offset == "bigint" && typeof size == "bigint")) return {
+        programCounter: programCounter+1,
+        stack: [...tempStack],
+        error: "Stack underflow",
+        continueExecution: false
+      }
+
+      const extCode = state.get(address)?.code?.bin;
+      if (!extCode) return {
+        programCounter: programCounter+1,
+        stack: [...tempStack ],
+        error: null,
+        continueExecution: true
+      }
+
+      const copiedBytes = (extCode.slice(Number(offset), Number(offset+size)));
+      if (copiedBytes.length == Number(size)) {
+        const result = setMemorySafely(memory, Number(destOffset), copiedBytes);
+        return {
+          programCounter: programCounter+1,
+          stack: [...tempStack ],
+          memory: result.memory,
+          additionalGas: result.additionalGas,
+          error: null,
+          continueExecution: true
+        }
+      }
+
+      const fullSizedCopiedBytes = new Uint8Array(Number(size)); // for out of bound bytes, 0s will be copied.
+      fullSizedCopiedBytes.set(copiedBytes);
+      const result = setMemorySafely(memory, Number(destOffset), fullSizedCopiedBytes);
+
+      return {
+        programCounter: programCounter+1,
+        stack: [...tempStack ],
+        memory: result.memory,
+        additionalGas: result.additionalGas,
+        error: null,
+        continueExecution: true
+      }
+    },
+  },
+
+  0x3f: {
+    name: 'EXTCODEHASH',
+    minimumGas: 100,
+    implementation: ({ stack, programCounter, memory, context: { state } }) => {
+      const tempStack = [...stack];
+
+      const address = tempStack.pop();
+
+      if (typeof address != "bigint") return {
+        programCounter: programCounter+1,
+        stack: [...tempStack],
+        error: "Stack underflow",
+        continueExecution: false
+      }
+
+      const account = state.get(address);
+      if (!account) return {
+        programCounter: programCounter+1,
+        stack: [...tempStack, 0n],
+        error: null,
+        continueExecution: true
+      }
+
+      const extCode = account.code?.bin;
+      const codeHash = BigInt(uint8ArrayToByteString(keccak256(extCode || new Uint8Array(0))));
+
+      return {
+        programCounter: programCounter+1,
+        stack: [...tempStack, codeHash],
+        error: null,
+        continueExecution: true
+      }
+    },
+  },
+
   0x40: {
     name: 'BLOCKHASH',
     minimumGas: 20,

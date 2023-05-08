@@ -1886,6 +1886,25 @@
     }
   },
   {
+    "name": "EXTCODEHASH (with account, but no code)",
+    "hint": "My own test",
+    "state": {
+      "0x1000000000000000000000000000000000000aaa": {
+        "balance": "0x00"
+      }
+    },
+    "code": {
+      "asm": "PUSH20 0x1000000000000000000000000000000000000aaa\nEXTCODEHASH",
+      "bin": "731000000000000000000000000000000000000aaa3f"
+    },
+    "expect": {
+      "stack": [
+        "0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470"
+      ],
+      "success": true
+    }
+  },
+  {
     "name": "EXTCODEHASH (empty)",
     "code": {
       "asm": "PUSH20 0x1000000000000000000000000000000000000aaa\nEXTCODEHASH",
