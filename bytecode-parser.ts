@@ -8,6 +8,16 @@ type Result = {
   returndata: BigInt,
 }
 
+type Block = {
+  basefee: bigint,
+  coinbase: bigint,
+  timestamp: bigint,
+  number: bigint,
+  difficulty: bigint,
+  gasLimit: bigint,
+  chainId: bigint,
+}
+
 export interface Context {
   address: bigint,
   caller: bigint,
@@ -19,7 +29,7 @@ export interface Context {
   gasPrice: bigint,
   gasLeft: number,
   origin: bigint,
-  //block: Block
+  block: Block
   //contract: Account
   //codeAddress: bigint         /* Different than address for DELEGATECALL and CALLCODE */
   //gasRefund: bigint           /* Current value (at begin of the frame) of the gas refund */

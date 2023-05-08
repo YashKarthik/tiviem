@@ -737,14 +737,14 @@ export const instructions: { [key: number]: Instruction } = {
   0x20: {
     name: 'SHA3',
     minimumGas: 30,
-    implementation: ({ stack, programCounter: counter, memory }) => {
+    implementation: ({ stack, programCounter, memory }) => {
       const tempStack = [...stack];
 
       const offset = tempStack.pop();
       const byteSize = tempStack.pop();
       if (!(typeof offset == "bigint" && typeof byteSize == "bigint")) return {
         stack: [ ...tempStack ],
-        programCounter: counter+1,
+        programCounter: programCounter+1,
         continueExecution: false,
         error: "Stack underflow"
       }
@@ -754,12 +754,148 @@ export const instructions: { [key: number]: Instruction } = {
 
       return {
         stack: [ ...tempStack, hash ],
-        programCounter: counter+1,
+        programCounter: programCounter+1,
         continueExecution: true,
         error: null
       }
 
     },
+  },
+
+  0x30: {
+    name: 'ADDRESS',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter, context: { address } }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, address],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
+  0x32: {
+    name: 'ORIGIN',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter, context: { origin } }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, origin],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
+  0x33: {
+    name: 'CALLER',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter: counter, context: { caller } }) => ({
+      programCounter: counter+1,
+      stack: [...stack, caller],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
+  0x3a: {
+    name: 'GASPRICE',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter, context: { gasPrice } }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, gasPrice],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
+  0x40: {
+    name: 'BLOCKHASH',
+    minimumGas: 20,
+    implementation: ({ stack, programCounter }) => {
+      const tempStack = [...stack];
+      tempStack.pop();
+      return {
+        programCounter: programCounter+1,
+        stack: [...tempStack, 0n],
+        error: null,
+        continueExecution: true
+      }
+    },
+  },
+
+  0x41: {
+    name: 'COINBASE',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter, context: { block } }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, block.coinbase],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
+  0x42: {
+    name: 'TIMESTAMP',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter, context: { block } }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, block.timestamp],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
+  0x43: {
+    name: 'NUMBER',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter, context: { block } }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, block.number],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
+  0x44: {
+    name: 'DIFFICULTY',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter, context: { block } }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, block.difficulty],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
+  0x45: {
+    name: 'GASLIMIT',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter, context: { block } }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, block.gasLimit],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
+  0x46: {
+    name: 'CHAINID',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter, context: { block } }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, block.chainId],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
+  0x48: {
+    name: 'BASEFEE',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter, context: { block } }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, block.basefee],
+      error: null,
+      continueExecution: true
+    }),
   },
 
 
