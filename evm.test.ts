@@ -32,7 +32,7 @@ for (const t of tests as any) {
       origin: BigInt(t?.tx?.origin || 0x00),
 
       callValue: BigInt(t?.tx?.value || 0n),
-      callData: hexStringToUint8Array(((t?.tx?.data || "00") as string).padEnd(64, "0")),
+      callData: hexStringToUint8Array(t?.tx?.data || ""),
       gasPrice: BigInt(t?.tx?.gasprice || 0n),
       gasLeft: 15_000_000,
 

@@ -87,6 +87,7 @@ export function evm(context: Context): Result {
     console.log("Stack:", runState.stack);
     console.log("Memory:", runState.memory);
     console.log("State:", runState.context.state);
+    console.log("Calldata:", runState.context.callData);
     console.log("gas:", runState.context.gasLeft, "\n");
 
     if (result.error) {
