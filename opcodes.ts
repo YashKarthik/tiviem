@@ -910,6 +910,62 @@ export const instructions: { [key: number]: Instruction } = {
     },
   },
 
+  0x38: {
+    name: 'CODESIZE',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter, context: { bytecode } }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, BigInt(bytecode.length)],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
+  0x39: {
+    name: 'CODECOPY',
+    minimumGas: 3,
+    implementation: ({ stack, programCounter, memory, context: { bytecode } }) => {
+      const tempStack = [...stack];
+
+      const destOffset = tempStack.pop();
+      const offset = tempStack.pop();
+      const size = tempStack.pop();
+
+      if (!(typeof destOffset == "bigint" && typeof offset == "bigint" && typeof size == "bigint")) return {
+        programCounter: programCounter+1,
+        stack: [...tempStack],
+        error: "Stack underflow",
+        continueExecution: false
+      }
+
+      const copiedBytes = (bytecode.slice(Number(offset), Number(offset+size)));
+      if (copiedBytes.length == Number(size)) {
+        const result = setMemorySafely(memory, Number(destOffset), copiedBytes);
+        return {
+          programCounter: programCounter+1,
+          stack: [...tempStack ],
+          memory: result.memory,
+          additionalGas: result.additionalGas,
+          error: null,
+          continueExecution: true
+        }
+      }
+
+      const fullSizedCopiedBytes = new Uint8Array(Number(size)); // for out of bound bytes, 0s will be copied.
+      fullSizedCopiedBytes.set(copiedBytes);
+      const result = setMemorySafely(memory, Number(destOffset), fullSizedCopiedBytes);
+
+      return {
+        programCounter: programCounter+1,
+        stack: [...tempStack ],
+        memory: result.memory,
+        additionalGas: result.additionalGas,
+        error: null,
+        continueExecution: true
+      }
+    },
+  },
+
   0x3a: {
     name: 'GASPRICE',
     minimumGas: 2,
