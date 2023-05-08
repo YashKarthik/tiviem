@@ -20,15 +20,16 @@ export interface Context {
   bytecode: Uint8Array,
 
   block: Block,
-  state: Map<bigint, State>, // address -> State
+  state: Map<bigint, AccountState>, // address -> State
 }
 
-export type State = {
-  balance?: bigint,
+export type AccountState = {
+  balance: bigint,
   code?: {
     asm: string | null,
     bin: Uint8Array
-  }
+  },
+  storage?: Map<bigint, bigint>,
 }
 
 type Block = {

@@ -1172,6 +1172,17 @@ export const instructions: { [key: number]: Instruction } = {
     }),
   },
 
+  0x47: {
+    name: 'SELFBALANCE',
+    minimumGas: 5,
+    implementation: ({ stack, programCounter, context: { address, state } }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, state.get(address)!.balance],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
   0x48: {
     name: 'BASEFEE',
     minimumGas: 2,
@@ -1288,6 +1299,68 @@ export const instructions: { [key: number]: Instruction } = {
         memory: result.memory,
         additionalGas: result.additionalGas,
         programCounter: counter+1,
+        continueExecution: true,
+        error: null
+      }
+    },
+  },
+
+  0x54: {
+    name: 'SLOAD',
+    minimumGas: 100,
+    implementation: ({ stack, programCounter, context: { state, address } }) => {
+      const tempStack = [...stack];
+      const key = tempStack.pop();
+
+      if (typeof key != "bigint") return {
+        stack: tempStack,
+        programCounter: programCounter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      const storage = state.get(address)!.storage!; // !.storage! cuz this account exists (it's being called);
+      const value = storage.get(key);
+
+      // key has never been written to before => return 0;
+      if (typeof value == "undefined") return {
+        stack: [...tempStack, 0n],
+        programCounter: programCounter+1,
+        continueExecution: true,
+        error: null
+      }
+
+      return {
+        stack: [...tempStack, value],
+        programCounter: programCounter+1,
+        continueExecution: true,
+        error: null
+      }
+    },
+  },
+
+  0x55: {
+    name: 'SSTORE',
+    minimumGas: 100,
+    implementation: ({ stack, programCounter, context: { state, address } }) => {
+      const tempStack = [...stack];
+      const key = tempStack.pop();
+      const value = tempStack.pop();
+
+      if (!(typeof key == "bigint" && typeof value == "bigint")) return {
+        stack: tempStack,
+        programCounter: programCounter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      const storage = state.get(address)!.storage!;
+      storage.set(key, value);
+      console.log("From SSTORE:", storage);
+
+      return {
+        stack: [...tempStack],
+        programCounter: programCounter+1,
         continueExecution: true,
         error: null
       }

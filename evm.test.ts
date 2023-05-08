@@ -1,4 +1,4 @@
-import { Context, evm, State as AccountState } from "./bytecode-parser";
+import { Context, evm, AccountState } from "./bytecode-parser";
 import { expect, test } from "bun:test";
 import { hexStringToUint8Array } from "./opcodes";
 
@@ -24,11 +24,13 @@ for (const t of tests as any) {
         const accountState = t.state[address];
 
         if (!accountState.balance) {
-          worldState.set(BigInt(address), { 
+          worldState.set(BigInt(address), {
+            balance: 0n,
             code: {
               asm: accountState.code.asm || null,
               bin: hexStringToUint8Array(accountState.code.bin)
-            }
+            },
+            storage: new Map<bigint, bigint>(),
           });
           return;
         }
@@ -45,13 +47,24 @@ for (const t of tests as any) {
           code: {
             asm: accountState.code.asm || null,
             bin: hexStringToUint8Array(accountState.code.bin)
-          }
+          },
+          storage: new Map<bigint, bigint>(),
         });
       });
     }
 
+    // always initialize the `to` contract's state, the one for whom our evm is executing stuff;
+    worldState.set(BigInt(t?.tx?.to || 0xff), {
+      balance: 100n,
+      code: {
+        asm: t.code.asm || null,
+        bin: hexStringToUint8Array(t.code.bin)
+      },
+      storage: new Map<bigint, bigint>(),
+    });
+
     const context: Context = {
-      address: BigInt(t?.tx?.to || 0x00),
+      address: BigInt(t?.tx?.to || 0xff),
       caller: BigInt(t?.tx?.from || 0x00),
       origin: BigInt(t?.tx?.origin || 0x00),
 
