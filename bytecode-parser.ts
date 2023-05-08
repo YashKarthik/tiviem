@@ -24,7 +24,11 @@ export interface Context {
 }
 
 export type State = {
-  balance: bigint,
+  balance?: bigint,
+  code?: {
+    asm: string | null,
+    bin: Uint8Array
+  }
 }
 
 type Block = {

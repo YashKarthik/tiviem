@@ -1,4 +1,4 @@
-import { Context, evm, State } from "./bytecode-parser";
+import { Context, evm, State as AccountState } from "./bytecode-parser";
 import { expect, test } from "bun:test";
 import { hexStringToUint8Array } from "./opcodes";
 
@@ -16,14 +16,38 @@ for (const t of tests as any) {
     console.log("Test opcodes");
     console.log("\x1b[34m%s\x1b[0m", t.code.asm, "\n");
 
-    const worldState = new Map<bigint, State>();
+    const worldState = new Map<bigint, AccountState>();
     if (t.state) {
       const addresses = Object.keys(t.state);
 
       addresses.forEach(address => {
-        worldState.set(BigInt(address), { balance: BigInt(t.state[address]["balance"])})
-      });
+        const accountState = t.state[address];
 
+        if (!accountState.balance) {
+          worldState.set(BigInt(address), { 
+            code: {
+              asm: accountState.code.asm || null,
+              bin: hexStringToUint8Array(accountState.code.bin)
+            }
+          });
+          return;
+        }
+
+        if (!t.state.code) {
+          worldState.set(BigInt(address), { 
+            balance: BigInt(accountState.balance)
+          });
+          return;
+        }
+
+        worldState.set(BigInt(address), {
+          balance: BigInt(accountState!.balance),
+          code: {
+            asm: accountState.code.asm || null,
+            bin: hexStringToUint8Array(accountState.code.bin)
+          }
+        });
+      });
     }
 
     const context: Context = {
