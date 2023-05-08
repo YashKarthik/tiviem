@@ -15,7 +15,19 @@ for (const t of tests as any) {
     console.log("Test bytecode: 0x"+t.code.bin);
     console.log("Test opcodes");
     console.log("\x1b[34m%s\x1b[0m", t.code.asm, "\n");
-    const result = evm(hexStringToUint8Array(t.code.bin), 15_000_000);
+
+    const context = {
+      address: 0xf0n,
+      caller: 0x00n,
+      bytecode: hexStringToUint8Array(t.code.bin),
+      //isStatic: boolean
+      //depth: number
+      gasPrice: 10n,
+      gasLeft: 15_000_000,
+      origin: 0x00n,
+    }
+
+    const result = evm(context);
 
     expect(result.success).toEqual(t.expect.success);
 

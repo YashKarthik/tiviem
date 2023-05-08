@@ -5,47 +5,40 @@
   **/
 
 import { keccak256 } from "ethereum-cryptography/keccak";
-
-type InstructionInput = {
-  stack: readonly bigint[],
-  memory: Uint8Array,
-  gas: number,
-  bytecode: Uint8Array,
-  counter: number
-}
+import { RunState } from "./bytecode-parser";
 
 type InstructionOutput = {
   stack: bigint[],
-  counter: number,
+  programCounter: number,
   continueExecution: boolean
-  error: string | null,
+  error?: string | null,
   memory?: Uint8Array,
   additionalGas?: number,
-  returndata?: BigInt,
+  returndata?: bigint,
 }
 
 interface Instruction {
   name: string;
   minimumGas: number;
-  implementation: (input: InstructionInput) => InstructionOutput;
+  implementation: (input: RunState) => InstructionOutput;
 }
 
 export const instructions: { [key: number]: Instruction } = {
   0x00: {
     name: 'STOP',
     minimumGas: 0,
-    implementation: ({ counter, stack }) => ({ stack: stack.map(s => s), counter: counter+1, continueExecution: false, error: null})
+    implementation: ({ programCounter: counter, stack }) => ({ stack: stack.map(s => s), programCounter: counter+1, continueExecution: false, error: null})
   },
   0x01: {
     name: 'ADD',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const b = tempStack.pop();
       if (!(typeof a == "bigint" && typeof b == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
@@ -53,7 +46,7 @@ export const instructions: { [key: number]: Instruction } = {
       const newStack = tempStack.concat(BigInt.asUintN(256, a + b))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -62,20 +55,20 @@ export const instructions: { [key: number]: Instruction } = {
   0x02: {
     name: 'MUL',
     minimumGas: 5,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const b = tempStack.pop();
       if (!(typeof a == "bigint" && typeof b == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, a * b))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -84,20 +77,20 @@ export const instructions: { [key: number]: Instruction } = {
   0x03: {
     name: 'SUB',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const b = tempStack.pop();
       if (!(typeof a == "bigint" && typeof b == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, a - b))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -106,26 +99,26 @@ export const instructions: { [key: number]: Instruction } = {
   0x04: {
     name: 'DIV',
     minimumGas: 5,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const b = tempStack.pop();
       if (!(typeof a == "bigint" && typeof b == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       if (b == 0n || a == 0n) return {
         stack: [ ...tempStack, 0n ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, a / b))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -134,13 +127,13 @@ export const instructions: { [key: number]: Instruction } = {
   0x05: {
     name: 'SDIV',
     minimumGas: 5,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const ta = tempStack.pop();
       const tb = tempStack.pop();
       if (!(typeof ta == "bigint" && typeof tb == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
@@ -148,14 +141,14 @@ export const instructions: { [key: number]: Instruction } = {
       const b = BigInt.asIntN(256, tb);
       if (b == 0n || a == 0n) return {
         stack: [ ...tempStack, 0n ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, a / b))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -165,26 +158,26 @@ export const instructions: { [key: number]: Instruction } = {
   0x06: {
     name: 'MOD',
     minimumGas: 5,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const b = tempStack.pop();
       if (!(typeof a == "bigint" && typeof b == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       if (b == 0n || a == 0n) return {
         stack: [ ...tempStack, 0n ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, a % b))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -194,13 +187,13 @@ export const instructions: { [key: number]: Instruction } = {
   0x07: {
     name: 'SMOD',
     minimumGas: 5,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const ta = tempStack.pop();
       const tb = tempStack.pop();
       if (!(typeof ta == "bigint" && typeof tb == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
@@ -208,14 +201,14 @@ export const instructions: { [key: number]: Instruction } = {
       const b = BigInt.asIntN(256, tb);
       if (b == 0n || a == 0n) return {
         stack: [ ...tempStack, 0n ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
       const newStack = tempStack.concat( BigInt.asUintN( 256, BigInt.asIntN(256, a) % BigInt.asIntN(256, b)));
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -225,7 +218,7 @@ export const instructions: { [key: number]: Instruction } = {
   0x08: {
     name: 'ADDMOD',
     minimumGas: 8,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const b = tempStack.pop();
@@ -233,20 +226,20 @@ export const instructions: { [key: number]: Instruction } = {
 
       if (!(typeof a == "bigint" && typeof b == "bigint" && typeof N == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       if (N == 0n) return {
         stack: [ ...tempStack, 0n ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, (a + b) % N))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -255,7 +248,7 @@ export const instructions: { [key: number]: Instruction } = {
   0x09: {
     name: 'MULMOD',
     minimumGas: 8,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const b = tempStack.pop();
@@ -263,20 +256,20 @@ export const instructions: { [key: number]: Instruction } = {
 
       if (!(typeof a == "bigint" && typeof b == "bigint" && typeof N == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       if (N == 0n) return {
         stack: [ ...tempStack, 0n ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, (a * b) % N))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -286,21 +279,21 @@ export const instructions: { [key: number]: Instruction } = {
   0x0a: {
     name: 'EXP',
     minimumGas: 10,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const exponent = tempStack.pop();
 
       if (!(typeof a == "bigint" && typeof exponent == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, (a ** exponent)))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -310,14 +303,14 @@ export const instructions: { [key: number]: Instruction } = {
   0x0b: {
     name: 'SIGNEXTEND',
     minimumGas: 5,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const b = tempStack.pop();
       const x = tempStack.pop();
 
       if (!(typeof b == "bigint" && typeof x == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
@@ -330,7 +323,7 @@ export const instructions: { [key: number]: Instruction } = {
         const newStack = tempStack.concat(BigInt.asUintN(256, x))
         return {
           stack: newStack,
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           error: null
         };
@@ -342,7 +335,7 @@ export const instructions: { [key: number]: Instruction } = {
         const newStack = tempStack.concat(BigInt.asUintN(256, x))
         return {
           stack: newStack,
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           error: null
         };
@@ -351,7 +344,7 @@ export const instructions: { [key: number]: Instruction } = {
       const newStack = tempStack.concat(BigInt.asUintN(256, ~msb | x))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -362,21 +355,21 @@ export const instructions: { [key: number]: Instruction } = {
   0x10: {
     name: 'LT',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const b = tempStack.pop();
 
       if (!(typeof a == "bigint" && typeof b == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, BigInt(a < b) ))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -386,21 +379,21 @@ export const instructions: { [key: number]: Instruction } = {
   0x11: {
     name: 'GT',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const b = tempStack.pop();
 
       if (!(typeof a == "bigint" && typeof b == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, BigInt(a > b) ))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -410,14 +403,14 @@ export const instructions: { [key: number]: Instruction } = {
   0x12: {
     name: 'SLT',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const ta = tempStack.pop();
       const tb = tempStack.pop();
 
       if (!(typeof ta == "bigint" && typeof tb == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
@@ -426,7 +419,7 @@ export const instructions: { [key: number]: Instruction } = {
       const newStack = tempStack.concat(BigInt.asUintN(256, BigInt(a < b) ))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -436,14 +429,14 @@ export const instructions: { [key: number]: Instruction } = {
   0x13: {
     name: 'SGT',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const ta = tempStack.pop();
       const tb = tempStack.pop();
 
       if (!(typeof ta == "bigint" && typeof tb == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
@@ -452,7 +445,7 @@ export const instructions: { [key: number]: Instruction } = {
       const newStack = tempStack.concat(BigInt.asUintN(256, BigInt(a > b) ))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -462,21 +455,21 @@ export const instructions: { [key: number]: Instruction } = {
   0x14: {
     name: 'EQ',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const b = tempStack.pop();
 
       if (!(typeof a == "bigint" && typeof b == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, BigInt(a == b) ))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -486,20 +479,20 @@ export const instructions: { [key: number]: Instruction } = {
   0x15: {
     name: 'ISZERO',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
 
       if (!(typeof a == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, BigInt(a == 0n) ))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -509,21 +502,21 @@ export const instructions: { [key: number]: Instruction } = {
   0x16: {
     name: 'AND',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const b = tempStack.pop();
 
       if (!(typeof a == "bigint" && typeof b == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, a & b))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -533,21 +526,21 @@ export const instructions: { [key: number]: Instruction } = {
   0x17: {
     name: 'OR',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const b = tempStack.pop();
 
       if (!(typeof a == "bigint" && typeof b == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, a | b))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -557,21 +550,21 @@ export const instructions: { [key: number]: Instruction } = {
   0x18: {
     name: 'XOR',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
       const b = tempStack.pop();
 
       if (!(typeof a == "bigint" && typeof b == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, a ^ b))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -581,20 +574,20 @@ export const instructions: { [key: number]: Instruction } = {
   0x19: {
     name: 'NOT',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const a = tempStack.pop();
 
       if (!(typeof a == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       const newStack = tempStack.concat(BigInt.asUintN(256, ~a))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       };
@@ -604,14 +597,14 @@ export const instructions: { [key: number]: Instruction } = {
   0x1a: {
     name: 'BYTE',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const i = tempStack.pop();
       const x = tempStack.pop();
 
       if (!(typeof i == "bigint" && typeof x == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
@@ -624,7 +617,7 @@ export const instructions: { [key: number]: Instruction } = {
       const newStack = tempStack.concat(BigInt(bytesArray[Number(i)] || 0 ))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: null,
       }
@@ -634,14 +627,14 @@ export const instructions: { [key: number]: Instruction } = {
   0x1b: {
     name: 'SHL',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const t_shift = tempStack.pop();
       const t_value = tempStack.pop();
 
       if (!(typeof t_shift == "bigint" && typeof t_value == "bigint")) return {
         stack: [ ...stack ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
@@ -649,13 +642,13 @@ export const instructions: { [key: number]: Instruction } = {
       const value = BigInt.asUintN(256, t_value);
       if (shift > 255n) return {
         stack: [ ...tempStack, 0n ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null,
       }
       return {
         stack: [ ...tempStack, BigInt.asUintN(256, value << shift)],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null,
       }
@@ -665,27 +658,27 @@ export const instructions: { [key: number]: Instruction } = {
   0x1c: {
     name: 'SHR',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const shift = tempStack.pop();
       const value = tempStack.pop();
 
       if (!(typeof shift == "bigint" && typeof value == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
       if (shift > 255n) return {
         stack: [ ...tempStack, 0n ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: null,
       }
       const newStack = tempStack.concat(BigInt.asUintN(256, value >> shift))
       return {
         stack: newStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: null,
       }
@@ -695,14 +688,14 @@ export const instructions: { [key: number]: Instruction } = {
   0x1d: {
     name: 'SAR',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       const tempStack = stack.map(s => s);
       const shift = tempStack.pop();
       const value = tempStack.pop();
 
       if (!(typeof shift == "bigint" && typeof value == "bigint")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       };
@@ -711,7 +704,7 @@ export const instructions: { [key: number]: Instruction } = {
       // the incoming bits are 0, which is the msb.
       if (!isSigned) return {
         stack: [ ...tempStack, BigInt.asUintN(256, value >> shift) ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: null
       }
@@ -721,7 +714,7 @@ export const instructions: { [key: number]: Instruction } = {
         // but doing with these large values, we could run out of memory, especially in JS/TS
         return {
           stack: [ ...tempStack, BigInt.asUintN(256, MAX_UINT256) ], // all the bits will be replaced by 1 => max value;
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           error: null
         }
@@ -734,7 +727,7 @@ export const instructions: { [key: number]: Instruction } = {
 
       return {
         stack: [ ...tempStack, BigInt.asUintN(256,  temp | mask) ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       }
@@ -744,15 +737,14 @@ export const instructions: { [key: number]: Instruction } = {
   0x20: {
     name: 'SHA3',
     minimumGas: 30,
-    implementation: ({ stack, counter, memory }) => {
+    implementation: ({ stack, programCounter: counter, memory }) => {
       const tempStack = [...stack];
-      const tempMemory = memory.slice();
 
       const offset = tempStack.pop();
       const byteSize = tempStack.pop();
       if (!(typeof offset == "bigint" && typeof byteSize == "bigint")) return {
         stack: [ ...tempStack ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       }
@@ -762,7 +754,7 @@ export const instructions: { [key: number]: Instruction } = {
 
       return {
         stack: [ ...tempStack, hash ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       }
@@ -775,8 +767,8 @@ export const instructions: { [key: number]: Instruction } = {
   0x50: {
     name: 'POP',
     minimumGas: 2,
-    implementation: ({ stack, counter }) => ({
-      counter: counter+1,
+    implementation: ({ stack, programCounter: counter }) => ({
+      programCounter: counter+1,
       stack: stack.slice(0, stack.length -1),
       error: null,
       continueExecution: true
@@ -786,13 +778,13 @@ export const instructions: { [key: number]: Instruction } = {
   0x51: {
     name: 'MLOAD',
     minimumGas: 3,
-    implementation: ({ stack, counter, memory }) => {
+    implementation: ({ stack, programCounter: counter, memory }) => {
       const tempStack = [...stack];
       const offset = tempStack.pop();
 
       if (typeof offset != "bigint") return {
         stack: tempStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       }
@@ -806,7 +798,7 @@ export const instructions: { [key: number]: Instruction } = {
         return {
           stack: tempStack,
           memory: memory,
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           error: null
         }
@@ -818,7 +810,7 @@ export const instructions: { [key: number]: Instruction } = {
       return {
         stack: tempStack,
         memory: tempMemory,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       }
@@ -827,14 +819,14 @@ export const instructions: { [key: number]: Instruction } = {
   0x52: {
     name: 'MSTORE',
     minimumGas: 3,
-    implementation: ({ stack, counter, memory }) => {
+    implementation: ({ stack, programCounter: counter, memory }) => {
       const tempStack = [...stack];
       const offset = tempStack.pop();
       const value = tempStack.pop();
 
       if (!(typeof offset == "bigint" && typeof value == "bigint")) return {
         stack: tempStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       }
@@ -846,7 +838,7 @@ export const instructions: { [key: number]: Instruction } = {
         stack: tempStack,
         memory: result.memory,
         additionalGas: result.additionalGas,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       }
@@ -855,14 +847,14 @@ export const instructions: { [key: number]: Instruction } = {
   0x53: {
     name: 'MSTORE8',
     minimumGas: 3,
-    implementation: ({ stack, counter, memory }) => {
+    implementation: ({ stack, programCounter: counter, memory }) => {
       const tempStack = [...stack];
       const offset = tempStack.pop();
       const value = tempStack.pop();
 
       if (!(typeof offset == "bigint" && typeof value == "bigint")) return {
         stack: tempStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       }
@@ -874,7 +866,7 @@ export const instructions: { [key: number]: Instruction } = {
         stack: tempStack,
         memory: result.memory,
         additionalGas: result.additionalGas,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       }
@@ -884,27 +876,27 @@ export const instructions: { [key: number]: Instruction } = {
   0x56: {
     name: 'JUMP',
     minimumGas: 8,
-    implementation: ({ counter, stack, bytecode }) => {
+    implementation: ({ programCounter: counter, stack, context: { bytecode } }) => {
       const tempStack = [...stack]
       const jumpDest = Number(tempStack.pop());
 
       if (typeof jumpDest != "number") return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       }
 
       if (getValidJumpDests(bytecode)[jumpDest] != 1) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Invalid JUMP."
       }
 
       return {
         stack: [ ...tempStack ],
-        counter: Number(jumpDest),
+        programCounter: Number(jumpDest),
         continueExecution: true,
         error: null
       }
@@ -913,21 +905,21 @@ export const instructions: { [key: number]: Instruction } = {
   0x57: {
     name: 'JUMPI',
     minimumGas: 8,
-    implementation: ({ counter, stack, bytecode }) => {
+    implementation: ({ programCounter: counter, stack, context: { bytecode } }) => {
       const tempStack = [...stack]
       const jumpDest = Number(tempStack.pop());
       const b = Number(tempStack.pop());
 
       if (!(typeof jumpDest == "number" && typeof b == "number")) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       }
 
       if (b == 0) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       }
@@ -935,14 +927,14 @@ export const instructions: { [key: number]: Instruction } = {
 
       if (getValidJumpDests(bytecode)[jumpDest] != 1) return {
         stack: [],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Invalid JUMP."
       }
 
       return {
         stack: [ ...tempStack ],
-        counter: Number(jumpDest),
+        programCounter: Number(jumpDest),
         continueExecution: true,
         error: null
       }
@@ -952,9 +944,9 @@ export const instructions: { [key: number]: Instruction } = {
   0x58: {
     name: 'PC',
     minimumGas: 2,
-    implementation: ({ counter, stack }) => ({
+    implementation: ({ programCounter: counter, stack }) => ({
       stack: [ ...stack, BigInt(counter) ],
-      counter: counter+1,
+      programCounter: counter+1,
       continueExecution: true,
       error: null
     })
@@ -963,9 +955,9 @@ export const instructions: { [key: number]: Instruction } = {
   0x59: {
     name: 'MSIZE',
     minimumGas: 2,
-    implementation: ({ counter, stack, memory }) => ({
+    implementation: ({ programCounter: counter, stack, memory }) => ({
       stack: [ ...stack, BigInt(memory.length) ],
-      counter: counter+1,
+      programCounter: counter+1,
       continueExecution: true,
       error: null
     })
@@ -973,19 +965,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x5a: {
     name: 'GAS',
     minimumGas: 2,
-    implementation: ({ counter, stack, gas }) => {
-      const remainingGas = gas - 2; // remaining gas after this instruction;
+    implementation: ({ programCounter: counter, stack, context: { gasLeft } }) => {
+      const remainingGas = gasLeft - 2; // remaining gas after this instruction;
 
       if (remainingGas < 0) return {
         stack: [ ...stack ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Out of gas."
       }
 
       return {
         stack: [ ...stack, BigInt(remainingGas) ],
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: true,
         error: null
       }
@@ -995,8 +987,8 @@ export const instructions: { [key: number]: Instruction } = {
   0x5B: {
     name: 'JUMPDEST',
     minimumGas: 1,
-    implementation: ({ stack, counter }) => ({
-      counter: counter+1,
+    implementation: ({ stack, programCounter: counter }) => ({
+      programCounter: counter+1,
       stack: [ ...stack ],
       error: null,
       continueExecution: true
@@ -1007,8 +999,8 @@ export const instructions: { [key: number]: Instruction } = {
   0x5F: {
     name: 'PUSH0',
     minimumGas: 2,
-    implementation: ({ stack, counter }) => ({
-      counter: counter+1,
+    implementation: ({ stack, programCounter: counter }) => ({
+      programCounter: counter+1,
       stack: [ ...stack, 0n ],
       error: null,
       continueExecution: true
@@ -1017,11 +1009,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x60: {
     name: 'PUSH1',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(1 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1031,11 +1023,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x61: {
     name: 'PUSH2',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(2 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1045,11 +1037,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x62: {
     name: 'PUSH3',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(3 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1059,11 +1051,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x63: {
     name: 'PUSH4',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(4 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1073,11 +1065,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x64: {
     name: 'PUSH5',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(5 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1087,11 +1079,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x65: {
     name: 'PUSH6',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(6 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1101,11 +1093,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x66: {
     name: 'PUSH7',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(7 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1115,11 +1107,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x67: {
     name: 'PUSH8',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(8 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1129,11 +1121,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x68: {
     name: 'PUSH9',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(9 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1143,11 +1135,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x69: {
     name: 'PUSH10',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(10 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1157,11 +1149,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x6a: {
     name: 'PUSH11',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(11 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1171,11 +1163,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x6b: {
     name: 'PUSH12',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(12 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1185,11 +1177,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x6c: {
     name: 'PUSH13',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(13 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1199,11 +1191,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x6d: {
     name: 'PUSH14',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(14 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1213,11 +1205,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x6e: {
     name: 'PUSH15',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(15 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1227,11 +1219,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x6f: {
     name: 'PUSH16',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(16 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1241,11 +1233,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x70: {
     name: 'PUSH17',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(17 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1255,11 +1247,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x71: {
     name: 'PUSH18',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(18 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1269,11 +1261,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x72: {
     name: 'PUSH19',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(19 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1283,11 +1275,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x73: {
     name: 'PUSH20',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(20 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1297,11 +1289,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x74: {
     name: 'PUSH21',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(21 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1311,11 +1303,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x75: {
     name: 'PUSH22',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(22 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1325,11 +1317,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x76: {
     name: 'PUSH23',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(23 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1339,11 +1331,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x77: {
     name: 'PUSH24',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(24 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1353,11 +1345,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x78: {
     name: 'PUSH25',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(25 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1367,11 +1359,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x79: {
     name: 'PUSH26',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(26 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1381,11 +1373,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x7a: {
     name: 'PUSH27',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(27 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1395,11 +1387,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x7b: {
     name: 'PUSH28',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(28 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1409,11 +1401,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x7c: {
     name: 'PUSH29',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(29 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1423,11 +1415,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x7d: {
     name: 'PUSH30',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(30 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1437,11 +1429,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x7e: {
     name: 'PUSH31',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(31 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1451,11 +1443,11 @@ export const instructions: { [key: number]: Instruction } = {
   0x7f: {
     name: 'PUSH32',
     minimumGas: 3,
-    implementation: ({ bytecode, stack, counter }) => {
+    implementation: ({ context: { bytecode }, stack, programCounter: counter }) => {
       const res = pushN(32 , counter, bytecode); 
       const newStack = stack.concat(res.value);
       return {
-        counter: res.counter,
+        programCounter: res.counter,
         stack: newStack,
         error: null,
         continueExecution: true
@@ -1467,18 +1459,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x80: {
     name: 'DUP1',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(1 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1489,18 +1481,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x81: {
     name: 'DUP2',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(2 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1511,18 +1503,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x82: {
     name: 'DUP3',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(3 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1533,18 +1525,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x83: {
     name: 'DUP4',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(4 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1555,18 +1547,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x84: {
     name: 'DUP5',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(5 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1577,18 +1569,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x85: {
     name: 'DUP6',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(6 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1599,18 +1591,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x86: {
     name: 'DUP7',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(7 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1621,18 +1613,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x87: {
     name: 'DUP8',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(8 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1643,18 +1635,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x88: {
     name: 'DUP9',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(9 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1665,18 +1657,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x89: {
     name: 'DUP10',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(10 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1687,18 +1679,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x8a: {
     name: 'DUP11',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(11 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1709,18 +1701,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x8b: {
     name: 'DUP12',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(12 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1731,18 +1723,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x8c: {
     name: 'DUP13',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(13 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1753,18 +1745,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x8d: {
     name: 'DUP14',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(14 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1775,18 +1767,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x8e: {
     name: 'DUP15',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(15 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1797,18 +1789,18 @@ export const instructions: { [key: number]: Instruction } = {
   0x8f: {
     name: 'DUP16',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const duppedValue = dupN(16 , stack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: [ ...stack, duppedValue],
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1821,19 +1813,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x90: {
     name: 'SWAP1',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(1, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1844,19 +1836,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x91: {
     name: 'SWAP2',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(2, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1867,19 +1859,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x92: {
     name: 'SWAP3',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(3, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1890,19 +1882,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x93: {
     name: 'SWAP4',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(4, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1913,19 +1905,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x94: {
     name: 'SWAP5',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(5, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1936,19 +1928,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x95: {
     name: 'SWAP6',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(6, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1959,19 +1951,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x96: {
     name: 'SWAP7',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(7, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -1982,19 +1974,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x97: {
     name: 'SWAP8',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(8, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -2005,19 +1997,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x98: {
     name: 'SWAP9',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(9, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -2028,19 +2020,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x99: {
     name: 'SWAP10',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(10, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -2051,19 +2043,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x9a: {
     name: 'SWAP11',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(11, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -2074,19 +2066,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x9b: {
     name: 'SWAP12',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(12, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -2097,19 +2089,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x9c: {
     name: 'SWAP13',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(13, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -2120,19 +2112,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x9d: {
     name: 'SWAP14',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(14, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -2143,19 +2135,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x9e: {
     name: 'SWAP15',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(15, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -2166,19 +2158,19 @@ export const instructions: { [key: number]: Instruction } = {
   0x9f: {
     name: 'SWAP16',
     minimumGas: 3,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ stack, programCounter: counter }) => {
       try {
         const tempStack = stack.map(s => s);
         swapN(16, tempStack);
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: true,
           stack: tempStack,
           error: null
         }
       } catch {
         return {
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           stack: [ ...stack ],
           error: "Stack underflow"
@@ -2190,14 +2182,14 @@ export const instructions: { [key: number]: Instruction } = {
   0xf3: {
     name: 'RETURN',
     minimumGas: 0,
-    implementation: ({ stack, counter, memory }) => {
+    implementation: ({ stack, programCounter: counter, memory }) => {
       const tempStack = [...stack];
       const offset = tempStack.pop();
       const size = tempStack.pop();
 
       if (!(typeof offset == "bigint" && typeof size == "bigint")) return {
         stack: tempStack,
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         error: "Stack underflow"
       }
@@ -2211,7 +2203,7 @@ export const instructions: { [key: number]: Instruction } = {
           stack: tempStack,
           memory: memory,
           returndata: BigInt(byteString),
-          counter: counter+1,
+          programCounter: counter+1,
           continueExecution: false,
           error: null
         }
@@ -2221,7 +2213,7 @@ export const instructions: { [key: number]: Instruction } = {
       return {
         stack: tempStack,
         memory: memory,
-        counter: counter+1,
+        programCounter: counter+1,
         returndata: BigInt(uint8ArrayToByteString(returnData.slice(Number(offset), Number(offset+size))).padEnd(64, "0")),
         continueExecution: false,
         error: null
@@ -2232,10 +2224,10 @@ export const instructions: { [key: number]: Instruction } = {
   0xfe: {
     name: "INVALID",
     minimumGas: NaN,
-    implementation: ({ stack, counter }) => {
+    implementation: ({ programCounter: counter }) => {
       console.log("INVALID");
       return {
-        counter: counter+1,
+        programCounter: counter+1,
         continueExecution: false,
         stack: [],
         error: "Stack underflow"

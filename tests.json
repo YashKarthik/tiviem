@@ -1192,14 +1192,14 @@
   },
   {
     "name": "GAS",
-    "hint": "In this version of the tests, GAS is not supported yet and is always expected to return MAX_UINT256",
+    "hint": "In this version of the tests, GAS is not supported yet and is always expected to return 15 million - 2",
     "code": {
       "asm": "GAS",
       "bin": "5a"
     },
     "expect": {
       "stack": [
-        "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        "0xE4E1BE"
       ],
       "success": true
     }
