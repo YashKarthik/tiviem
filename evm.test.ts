@@ -53,9 +53,11 @@ for (const t of tests as any) {
       });
     }
 
+    const CONTRACT_ADDRESS = BigInt(t?.tx?.to || 0xff);
+
     // always initialize the `to` contract's state, the one for whom our evm is executing stuff;
-    worldState.set(BigInt(t?.tx?.to || 0xff), {
-      balance: 100n,
+    worldState.set(CONTRACT_ADDRESS, {
+      balance: worldState.get(CONTRACT_ADDRESS)?.balance || 0n,
       code: {
         asm: t.code.asm || null,
         bin: hexStringToUint8Array(t.code.bin)
@@ -64,7 +66,7 @@ for (const t of tests as any) {
     });
 
     const context: Context = {
-      address: BigInt(t?.tx?.to || 0xff),
+      address: CONTRACT_ADDRESS,
       caller: BigInt(t?.tx?.from || 0x00),
       origin: BigInt(t?.tx?.origin || 0x00),
 
