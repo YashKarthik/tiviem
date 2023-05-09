@@ -5,7 +5,7 @@
   **/
 
 import { keccak256 } from "ethereum-cryptography/keccak";
-import { RunState } from "./bytecode-parser";
+import { Log, RunState } from "./bytecode-parser";
 
 type InstructionOutput = {
   stack: bigint[],
@@ -15,6 +15,7 @@ type InstructionOutput = {
   memory?: Uint8Array,
   additionalGas?: number,
   returndata?: bigint,
+  logs?: Log[],
 }
 
 interface Instruction {
@@ -2673,6 +2674,32 @@ export const instructions: { [key: number]: Instruction } = {
     }
   },
 
+  0xa0: {
+    name: 'LOG0',
+    minimumGas: 375,
+    implementation: ({ stack, programCounter, memory, context: { address } }) => logN(0, stack, programCounter, memory, address),
+  },
+  0xa1: {
+    name: 'LOG1',
+    minimumGas: 750,
+    implementation: ({ stack, programCounter, memory, context: { address } }) => logN(1, stack, programCounter, memory, address),
+  },
+  0xa2: {
+    name: 'LOG2',
+    minimumGas: 1125,
+    implementation: ({ stack, programCounter, memory, context: { address } }) => logN(2, stack, programCounter, memory, address),
+  },
+  0xa3: {
+    name: 'LOG3',
+    minimumGas: 1500,
+    implementation: ({ stack, programCounter, memory, context: { address } }) => logN(3, stack, programCounter, memory, address),
+  },
+  0xa4: {
+    name: 'LOG4',
+    minimumGas: 1875,
+    implementation: ({ stack, programCounter, memory, context: { address } }) => logN(4, stack, programCounter, memory, address),
+  },
+
   0xf3: {
     name: 'RETURN',
     minimumGas: 0,
@@ -2756,6 +2783,73 @@ function pushN(n: number, counter: number, bytecode: Uint8Array) {
   return {
     counter,
     value: valueToBePushed
+  }
+}
+
+function logN(
+  n:number,
+  stack: readonly bigint[],
+  programCounter: number,
+  memory: Uint8Array,
+  address: bigint
+): InstructionOutput {
+
+  const tempStack = [...stack];
+  const offset = tempStack.pop();
+  const size = tempStack.pop();
+  const topics: bigint[] = [];
+
+  if (!(typeof offset == "bigint" && typeof size == "bigint")) return {
+    stack: tempStack,
+    programCounter: programCounter+1,
+    continueExecution: false,
+    error: "Stack underflow"
+  }
+
+  for (let i=0; i < n; i++) {
+    const topic = tempStack.pop();
+
+    if (typeof topic != "bigint") return {
+      stack: tempStack,
+      programCounter: programCounter+1,
+      continueExecution: false,
+      error: "Stack underflow"
+    }
+
+    topics.push(topic);
+  }
+
+  const logData = memory.slice(Number(offset), Number(offset+size))
+
+  if (logData.length == Number(size)) {
+    return {
+      stack: tempStack,
+      memory: memory,
+      logs: [{
+        address: address,
+        data: BigInt(uint8ArrayToByteString(logData)),
+        topics: topics,
+      }],
+      programCounter: programCounter+1,
+      continueExecution: true,
+      error: null
+    }
+  }
+
+  const result = expandMemory(memory, Number(offset)+32);
+
+  return {
+    stack: tempStack,
+    memory: memory,
+    programCounter: programCounter+1,
+    logs: [{
+      address: address,
+      data: BigInt(uint8ArrayToByteString(result.memory.slice(Number(offset), Number(offset+size))).padEnd(64, "0")),
+      topics: topics,
+    }],
+    additionalGas: result.gasCost,
+    continueExecution: true,
+    error: null
   }
 }
 

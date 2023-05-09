@@ -1,4 +1,4 @@
-import { Context, evm, AccountState } from "./bytecode-parser";
+import { Context, evm, AccountState, Log } from "./bytecode-parser";
 import { expect, test } from "bun:test";
 import { hexStringToUint8Array } from "./opcodes";
 
@@ -94,6 +94,14 @@ for (const t of tests as any) {
 
     if (t.expect.stack) {
       expect(result.stack).toEqual(t.expect.stack.map((item:any) => BigInt(item)));
+    }
+
+    if (t.expect.logs) {
+      expect(result.logs).toEqual(t.expect.logs.map((item:any) => ({
+        address: BigInt(item.address),
+        data: BigInt("0x" + item.data),
+        topics: item.topics.map((topic:any) => BigInt(topic))
+      })));
     }
 
     if (t.expect.return) {

@@ -6,6 +6,7 @@ type Result = {
   memory: Uint8Array,
   gas: number,
   returndata: BigInt,
+  logs: Log[],
 }
 
 export interface Context {
@@ -46,6 +47,7 @@ export interface RunState {
   programCounter: number
   opcode: number
   memory: Uint8Array,
+  logs: Log[],
   //memoryWordCount: bigint
   //highestMemCost: bigint
   stack: bigint[],
@@ -53,6 +55,12 @@ export interface RunState {
   //gasRefund: bigint // Tracks the current refund
   returndata: bigint /* Current bytes in the return buffer. Cleared each time a CALL/CREATE is made in the current frame. */
   context: Context,
+}
+
+export type Log = {
+  address: bigint,
+  data: bigint,
+  topics: bigint[],
 }
 
 export function evm(context: Context): Result {
@@ -64,6 +72,7 @@ export function evm(context: Context): Result {
     stack: [],
     context: context,
     returndata: 0n,
+    logs: [],
   }
 
 
@@ -75,6 +84,7 @@ export function evm(context: Context): Result {
     runState.programCounter = result.programCounter;
     if (result.memory) runState.memory = result.memory;
     if (result.returndata) runState.returndata = result.returndata;
+    if (result.logs) runState.logs.push(...result.logs);
 
     // Check if operation is reverted before or after performing it,
     // as it will affect the current state of memory, stack
@@ -85,7 +95,8 @@ export function evm(context: Context): Result {
       stack: runState.stack.reverse(),
       memory: runState.memory,
       gas: runState.context.gasLeft,
-      returndata: runState.returndata
+      returndata: runState.returndata,
+      logs: runState.logs,
     }
 
     console.log("\x1b[33m%s\x1b[0m", "0x" + runState.opcode.toString(16), "\x1b[37m%s\x1b[0m", instructions[runState.opcode].name + " @ ", "\x1b[33m%s\x1b[0m", "PC=" + runState.programCounter);
@@ -93,6 +104,7 @@ export function evm(context: Context): Result {
     console.log("Memory:", runState.memory);
     console.log("State:", runState.context.state);
     console.log("Calldata:", runState.context.callData);
+    console.log("Logs:", runState.logs);
     console.log("gas:", runState.context.gasLeft, "\n");
 
     if (result.error) {
@@ -103,7 +115,8 @@ export function evm(context: Context): Result {
         stack: runState.stack.reverse(),
         memory: runState.memory,
         gas: runState.context.gasLeft,
-        returndata: runState.returndata
+        returndata: runState.returndata,
+        logs: runState.logs,
       }
     }
     if (!result.continueExecution) break;
@@ -116,6 +129,7 @@ export function evm(context: Context): Result {
     stack: runState.stack.reverse(),
     memory: runState.memory,
     gas: runState.context.gasLeft,
-    returndata: runState.returndata
+    returndata: runState.returndata,
+    logs: runState.logs
   }
 }
