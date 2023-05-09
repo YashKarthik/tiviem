@@ -2742,6 +2742,48 @@ export const instructions: { [key: number]: Instruction } = {
     },
   },
 
+  0xfd: {
+    name: 'REVERT',
+    minimumGas: 0,
+    implementation: ({ stack, programCounter: counter, memory }) => {
+      const tempStack = [...stack];
+      const offset = tempStack.pop();
+      const size = tempStack.pop();
+
+      if (!(typeof offset == "bigint" && typeof size == "bigint")) return {
+        stack: tempStack,
+        programCounter: counter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      const bytesToBeReturned = memory.slice(Number(offset), Number(offset+size))
+
+      if (bytesToBeReturned.length == Number(size)) {
+        const byteString = uint8ArrayToByteString(bytesToBeReturned);
+
+        return {
+          stack: tempStack,
+          memory: memory,
+          returndata: BigInt(byteString),
+          programCounter: counter+1,
+          continueExecution: false,
+          error: "Execution reverted"
+        }
+      }
+      const { memory: returnData } = expandMemory(memory, Number(offset)+32);
+
+      return {
+        stack: [...tempStack, 0n],
+        memory: memory,
+        programCounter: counter+1,
+        returndata: BigInt(uint8ArrayToByteString(returnData.slice(Number(offset), Number(offset+size))).padEnd(64, "0")),
+        continueExecution: false,
+        error: "Execution reverted"
+      }
+    },
+  },
+
   0xfe: {
     name: "INVALID",
     minimumGas: NaN,

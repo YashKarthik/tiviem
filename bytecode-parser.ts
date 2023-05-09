@@ -75,7 +75,6 @@ export function evm(context: Context): Result {
     logs: [],
   }
 
-
   for (runState.programCounter = 0; runState.programCounter < context.bytecode.length; ) {
     runState.opcode = context.bytecode[runState.programCounter] as keyof typeof instructions;
     const result = instructions[runState.opcode].implementation(runState);
