@@ -1058,10 +1058,57 @@ export const instructions: { [key: number]: Instruction } = {
     },
   },
 
+  0x3d: {
+    name: 'RETURNDATASIZE',
+    minimumGas: 2,
+    implementation: ({ stack, programCounter, returndata }) => ({
+      programCounter: programCounter+1,
+      stack: [...stack, BigInt(returndata.length)],
+      error: null,
+      continueExecution: true
+    }),
+  },
+
+  0x3e: {
+    name: 'RETURNDATACOPY',
+    minimumGas: 3,
+    implementation: ({ stack, programCounter, memory, returndata }) => {
+      const tempStack = [...stack];
+      let additionalGasConsumed = 0;
+
+      const destOffset = tempStack.pop();
+      const offset = tempStack.pop();
+      const size = tempStack.pop();
+
+      if (!(typeof destOffset == "bigint" && typeof offset == "bigint" && typeof size == "bigint")) return {
+        programCounter: programCounter+1,
+        stack: [...tempStack],
+        error: "Stack underflow",
+        continueExecution: false
+      }
+
+      const copyResult = readMemorySafely(returndata, Number(offset), Number(size));
+      additionalGasConsumed += copyResult.additionalGas;
+
+      const pasteResult = setMemorySafely(memory, Number(destOffset), copyResult.dataArray);
+      additionalGasConsumed += pasteResult.additionalGas;
+
+      return {
+        programCounter: programCounter+1,
+        stack: tempStack,
+        memory: pasteResult.memory,
+        returndata: copyResult.memory,
+        additionalGas: additionalGasConsumed,
+        error: null,
+        continueExecution: true
+      }
+    },
+  },
+
   0x3f: {
     name: 'EXTCODEHASH',
     minimumGas: 100,
-    implementation: ({ stack, programCounter, memory, context: { state } }) => {
+    implementation: ({ stack, programCounter, context: { state } }) => {
       const tempStack = [...stack];
 
       const address = tempStack.pop();
@@ -2753,6 +2800,7 @@ export const instructions: { [key: number]: Instruction } = {
         stack: [...tempStack, 0n],
         programCounter: programCounter+1,
         memory: tempMemory.memory,
+        returndata: callResult.returndata,
         additionalGas: gasConsumed,
         continueExecution: true,
         error: null
@@ -2762,6 +2810,7 @@ export const instructions: { [key: number]: Instruction } = {
         stack: [...tempStack, 1n],
         programCounter: programCounter+1,
         memory: tempMemory.memory,
+        returndata: callResult.returndata,
         additionalGas: gasConsumed,
         continueExecution: true,
         error: null
@@ -2950,7 +2999,7 @@ function setMemorySafely(memory: Uint8Array, offset:number, valueByteArray: Uint
   let tempMemory = memory.slice(0,);
   
   try {
-    tempMemory.set(valueByteArray,);
+    tempMemory.set(valueByteArray, offset);
     return {
       memory: tempMemory,
       additionalGas: 0
@@ -2958,7 +3007,7 @@ function setMemorySafely(memory: Uint8Array, offset:number, valueByteArray: Uint
   } catch (e) {
     const result = expandMemory(tempMemory, offset + valueByteArray.length);
     tempMemory = result.memory;
-    tempMemory.set(valueByteArray, Number(offset));
+    tempMemory.set(valueByteArray, offset);
 
     return {
       memory: tempMemory,
