@@ -1,6 +1,6 @@
 import { Context, evm, AccountState, Log } from "./bytecode-parser";
 import { expect, test } from "bun:test";
-import { hexStringToUint8Array } from "./opcodes";
+import { hexStringToUint8Array, uint8ArrayToByteString } from "./opcodes";
 
 //@ts-expect-error The file exists!
 import tests from "./tests";
@@ -105,7 +105,7 @@ for (const t of tests as any) {
     }
 
     if (t.expect.return) {
-      expect(result.returndata).toEqual(BigInt("0x" + t.expect.return));
+      expect(BigInt(uint8ArrayToByteString(result.returndata))).toEqual(BigInt("0x" + t.expect.return));
     }
   });
 }

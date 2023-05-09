@@ -5,7 +5,7 @@
   **/
 
 import { keccak256 } from "ethereum-cryptography/keccak";
-import { Log, RunState } from "./bytecode-parser";
+import { Context, evm, Log, RunState } from "./bytecode-parser";
 
 type InstructionOutput = {
   stack: bigint[],
@@ -14,7 +14,7 @@ type InstructionOutput = {
   error?: string | null,
   memory?: Uint8Array,
   additionalGas?: number,
-  returndata?: bigint,
+  returndata?: Uint8Array,
   logs?: Log[],
 }
 
@@ -742,20 +742,21 @@ export const instructions: { [key: number]: Instruction } = {
       const tempStack = [...stack];
 
       const offset = tempStack.pop();
-      const byteSize = tempStack.pop();
-      if (!(typeof offset == "bigint" && typeof byteSize == "bigint")) return {
+      const size = tempStack.pop();
+      if (!(typeof offset == "bigint" && typeof size == "bigint")) return {
         stack: [ ...tempStack ],
         programCounter: programCounter+1,
         continueExecution: false,
         error: "Stack underflow"
       }
 
-      const toHash = memory.slice(Number(offset), Number(offset+byteSize));
-      const hash = BigInt(uint8ArrayToByteString(keccak256(toHash)));
+      const result = readMemorySafely(memory, Number(offset), Number(size));
+      const hash = BigInt(uint8ArrayToByteString(keccak256(result.dataArray)));
 
       return {
         stack: [ ...tempStack, hash ],
         programCounter: programCounter+1,
+        additionalGas: result.additionalGas,
         continueExecution: true,
         error: null
       }
@@ -1222,28 +1223,13 @@ export const instructions: { [key: number]: Instruction } = {
         error: "Stack underflow"
       }
 
-      const bytesToBePushed = memory.slice(Number(offset), Number(offset)+32)
-
-      if (bytesToBePushed.length == 32) {
-        const byteString = uint8ArrayToByteString(bytesToBePushed);
-        tempStack.push(BigInt(byteString));
-
-        return {
-          stack: tempStack,
-          memory: memory,
-          programCounter: counter+1,
-          continueExecution: true,
-          error: null
-        }
-      }
-
-      const { memory: tempMemory } = expandMemory(memory, Number(offset)+32);
-      tempStack.push(BigInt(uint8ArrayToByteString(tempMemory.slice(Number(offset), Number(offset)+32)).padEnd(64, "0")));
+      const result = readMemorySafely(memory, Number(offset), 32)
 
       return {
-        stack: tempStack,
-        memory: tempMemory,
+        stack: [...tempStack, result.data],
+        memory: result.memory,
         programCounter: counter+1,
+        additionalGas: result.additionalGas,
         continueExecution: true,
         error: null
       }
@@ -2700,6 +2686,89 @@ export const instructions: { [key: number]: Instruction } = {
     implementation: ({ stack, programCounter, memory, context: { address } }) => logN(4, stack, programCounter, memory, address),
   },
 
+  0xf1: {
+    name: 'CALL',
+    minimumGas: 100,
+    implementation: ({ stack, programCounter, memory, context }) => {
+      const tempStack = [...stack];
+      let callGas = tempStack.pop();
+      const toAddress = tempStack.pop();
+      const callValue = tempStack.pop();
+      const argsOffset = tempStack.pop();
+      const argsSize = tempStack.pop();
+      const retOffset = tempStack.pop();
+      const retSize = tempStack.pop();
+
+      let gasConsumed = 0;
+
+      if (!(
+        typeof callGas == "bigint" &&
+        typeof toAddress == "bigint" &&
+        typeof callValue == "bigint" &&
+        typeof argsOffset == "bigint" &&
+        typeof argsSize == "bigint" &&
+        typeof retOffset == "bigint" &&
+        typeof retSize == "bigint"
+      )) return {
+        stack: tempStack,
+        programCounter: programCounter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      if (callGas > ((context.gasLeft - 100)/64)) callGas = BigInt(((context.gasLeft - 100)/64));
+      gasConsumed += Number(callGas);
+
+      const callArgs = readMemorySafely(memory, Number(argsOffset), Number(argsSize));
+      gasConsumed += callArgs.additionalGas;
+
+      const destinationCode = context.state.get(toAddress)?.code?.bin;
+      if (!destinationCode) return {
+        stack: tempStack,
+        programCounter: programCounter+1,
+        continueExecution: true,
+        error: null
+      }
+
+      const subContext: Context = {
+        address: toAddress,
+        caller: context.address,
+        origin: context.origin,
+        gasPrice: context.gasPrice,
+        gasLeft: Number(callGas),
+        callValue: callValue,
+        callData: callArgs.dataArray,
+        bytecode: destinationCode,
+        block: context.block,
+        state: context.state
+      }
+
+      const callResult = evm(subContext);
+      gasConsumed -= Number(callGas) - callResult.gas;
+
+      const tempMemory = setMemorySafely(memory, Number(retOffset), callResult.returndata);
+      gasConsumed += tempMemory.additionalGas;
+
+      if (!callResult.success) return {
+        stack: [...tempStack, 0n],
+        programCounter: programCounter+1,
+        memory: tempMemory.memory,
+        additionalGas: gasConsumed,
+        continueExecution: true,
+        error: null
+      }
+
+      return {
+        stack: [...tempStack, 1n],
+        programCounter: programCounter+1,
+        memory: tempMemory.memory,
+        additionalGas: gasConsumed,
+        continueExecution: true,
+        error: null
+      }
+    }
+  },
+
   0xf3: {
     name: 'RETURN',
     minimumGas: 0,
@@ -2715,27 +2784,12 @@ export const instructions: { [key: number]: Instruction } = {
         error: "Stack underflow"
       }
 
-      const bytesToBeReturned = memory.slice(Number(offset), Number(offset+size))
-
-      if (bytesToBeReturned.length == Number(size)) {
-        const byteString = uint8ArrayToByteString(bytesToBeReturned);
-
-        return {
-          stack: tempStack,
-          memory: memory,
-          returndata: BigInt(byteString),
-          programCounter: counter+1,
-          continueExecution: false,
-          error: null
-        }
-      }
-      const { memory: returnData } = expandMemory(memory, Number(offset)+32);
-
+      const result = readMemorySafely(memory, Number(offset), Number(size));
       return {
         stack: tempStack,
-        memory: memory,
+        memory: result.memory,
         programCounter: counter+1,
-        returndata: BigInt(uint8ArrayToByteString(returnData.slice(Number(offset), Number(offset+size))).padEnd(64, "0")),
+        returndata: result.dataArray,
         continueExecution: false,
         error: null
       }
@@ -2757,27 +2811,13 @@ export const instructions: { [key: number]: Instruction } = {
         error: "Stack underflow"
       }
 
-      const bytesToBeReturned = memory.slice(Number(offset), Number(offset+size))
-
-      if (bytesToBeReturned.length == Number(size)) {
-        const byteString = uint8ArrayToByteString(bytesToBeReturned);
-
-        return {
-          stack: tempStack,
-          memory: memory,
-          returndata: BigInt(byteString),
-          programCounter: counter+1,
-          continueExecution: false,
-          error: "Execution reverted"
-        }
-      }
-      const { memory: returnData } = expandMemory(memory, Number(offset)+32);
+      const result = readMemorySafely(memory, Number(offset), Number(size));
 
       return {
         stack: [...tempStack, 0n],
-        memory: memory,
+        memory: result.memory,
         programCounter: counter+1,
-        returndata: BigInt(uint8ArrayToByteString(returnData.slice(Number(offset), Number(offset+size))).padEnd(64, "0")),
+        returndata: result.dataArray,
         continueExecution: false,
         error: "Execution reverted"
       }
@@ -2861,35 +2901,18 @@ function logN(
     topics.push(topic);
   }
 
-  const logData = memory.slice(Number(offset), Number(offset+size))
-
-  if (logData.length == Number(size)) {
-    return {
-      stack: tempStack,
-      memory: memory,
-      logs: [{
-        address: address,
-        data: BigInt(uint8ArrayToByteString(logData)),
-        topics: topics,
-      }],
-      programCounter: programCounter+1,
-      continueExecution: true,
-      error: null
-    }
-  }
-
-  const result = expandMemory(memory, Number(offset)+32);
+  const result = readMemorySafely(memory, Number(offset), Number(size));
 
   return {
     stack: tempStack,
-    memory: memory,
+    memory: result.memory,
     programCounter: programCounter+1,
     logs: [{
       address: address,
-      data: BigInt(uint8ArrayToByteString(result.memory.slice(Number(offset), Number(offset+size))).padEnd(64, "0")),
+      data: result.data,
       topics: topics,
     }],
-    additionalGas: result.gasCost,
+    additionalGas: result.additionalGas,
     continueExecution: true,
     error: null
   }
@@ -2919,6 +2942,7 @@ function getValidJumpDests(code: Uint8Array) {
 export function uint8ArrayToByteString(bytesArr:Uint8Array): string {
   let byteString = "0x";
   bytesArr.forEach(byte => byteString = byteString + byte.toString(16).padStart(2, "0"));
+  if (byteString == "0x") return "0x00";
   return byteString;
 }
 
@@ -2940,6 +2964,28 @@ function setMemorySafely(memory: Uint8Array, offset:number, valueByteArray: Uint
       memory: tempMemory,
       additionalGas: result.gasCost
     };
+  }
+}
+
+function readMemorySafely(memory:Uint8Array, offset: number, size: number): { data: bigint, dataArray: Uint8Array, memory: Uint8Array, additionalGas: number } {
+  const bytesFromMemory = memory.slice(offset, offset+size)
+
+  if (bytesFromMemory.length == size) {
+    return {
+      data: BigInt(uint8ArrayToByteString(bytesFromMemory)),
+      dataArray: bytesFromMemory,
+      memory: memory,
+      additionalGas: 0
+    }
+  }
+
+  const result = expandMemory(memory, offset+size);
+  const fullSizedBytesFromMemory = result.memory.slice(offset, offset+size);
+  return {
+    data: BigInt(uint8ArrayToByteString(fullSizedBytesFromMemory)),
+    dataArray: fullSizedBytesFromMemory,
+    memory: result.memory,
+    additionalGas: result.gasCost
   }
 }
 

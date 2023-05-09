@@ -5,7 +5,7 @@ type Result = {
   stack: bigint[],
   memory: Uint8Array,
   gas: number,
-  returndata: BigInt,
+  returndata: Uint8Array,
   logs: Log[],
 }
 
@@ -53,7 +53,7 @@ export interface RunState {
   stack: bigint[],
   //messageGasLimit?: bigint // Cache value from `gas.ts` to save gas limit for a message call
   //gasRefund: bigint // Tracks the current refund
-  returndata: bigint /* Current bytes in the return buffer. Cleared each time a CALL/CREATE is made in the current frame. */
+  returndata: Uint8Array /* Current bytes in the return buffer. Cleared each time a CALL/CREATE is made in the current frame. */
   context: Context,
 }
 
@@ -64,6 +64,7 @@ export type Log = {
 }
 
 export function evm(context: Context): Result {
+  console.log("\n\n --------------- NEW CONTEXT ---------------\n\n")
 
   const runState: RunState = {
     programCounter: 0,
@@ -71,9 +72,11 @@ export function evm(context: Context): Result {
     memory: new Uint8Array(0),
     stack: [],
     context: context,
-    returndata: 0n,
+    returndata: new Uint8Array(0),
     logs: [],
   }
+
+  console.log(context.bytecode, runState.programCounter);
 
   for (runState.programCounter = 0; runState.programCounter < context.bytecode.length; ) {
     runState.opcode = context.bytecode[runState.programCounter] as keyof typeof instructions;
@@ -89,14 +92,14 @@ export function evm(context: Context): Result {
     // as it will affect the current state of memory, stack
     runState.context.gasLeft -= instructions[runState.opcode].minimumGas;
     if (result.additionalGas) runState.context.gasLeft -= result.additionalGas;
-    if (runState.context.gasLeft < 0) return {
-      success: false,
-      stack: runState.stack.reverse(),
-      memory: runState.memory,
-      gas: runState.context.gasLeft,
-      returndata: runState.returndata,
-      logs: runState.logs,
-    }
+    //if (runState.context.gasLeft < 0) return {
+    //  success: false,
+    //  stack: runState.stack.reverse(),
+    //  memory: runState.memory,
+    //  gas: runState.context.gasLeft,
+    //  returndata: runState.returndata,
+    //  logs: runState.logs,
+    //}
 
     console.log("\x1b[33m%s\x1b[0m", "0x" + runState.opcode.toString(16), "\x1b[37m%s\x1b[0m", instructions[runState.opcode].name + " @ ", "\x1b[33m%s\x1b[0m", "PC=" + runState.programCounter);
     console.log("Stack:", runState.stack);
