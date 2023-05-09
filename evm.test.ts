@@ -1,4 +1,4 @@
-import { Context, evm, AccountState, Log } from "./bytecode-parser";
+import { Context, evm, AccountState } from "./bytecode-parser";
 import { expect, test } from "bun:test";
 import { hexStringToUint8Array, uint8ArrayToByteString } from "./opcodes";
 
@@ -74,6 +74,7 @@ for (const t of tests as any) {
       callData: hexStringToUint8Array(t?.tx?.data || ""),
       gasPrice: BigInt(t?.tx?.gasprice || 0n),
       gasLeft: 15_000_000,
+      isStatic: false,
 
       bytecode: hexStringToUint8Array(t.code.bin),
       block: {

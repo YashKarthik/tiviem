@@ -1376,25 +1376,28 @@ export const instructions: { [key: number]: Instruction } = {
   0x55: {
     name: 'SSTORE',
     minimumGas: 100,
-    implementation: ({ stack, programCounter, context: { state, address } }) => {
-      const tempStack = [...stack];
+    implementation: (runState) => {
+
+      if (runState.context.isStatic) return instructions[parseInt("0xfd")].implementation(runState);
+
+      const tempStack = [...runState.stack];
       const key = tempStack.pop();
       const value = tempStack.pop();
 
       if (!(typeof key == "bigint" && typeof value == "bigint")) return {
         stack: tempStack,
-        programCounter: programCounter+1,
+        programCounter: runState.programCounter+1,
         continueExecution: false,
         error: "Stack underflow"
       }
 
-      const storage = state.get(address)!.storage!;
+      const storage = runState.context.state.get(runState.context.address)!.storage!;
       storage.set(key, value);
       console.log("From SSTORE:", storage);
 
       return {
         stack: [...tempStack],
-        programCounter: programCounter+1,
+        programCounter: runState.programCounter+1,
         continueExecution: true,
         error: null
       }
@@ -2710,34 +2713,36 @@ export const instructions: { [key: number]: Instruction } = {
   0xa0: {
     name: 'LOG0',
     minimumGas: 375,
-    implementation: ({ stack, programCounter, memory, context: { address } }) => logN(0, stack, programCounter, memory, address),
+    implementation: (runState) => logN(0, runState),
   },
   0xa1: {
     name: 'LOG1',
     minimumGas: 750,
-    implementation: ({ stack, programCounter, memory, context: { address } }) => logN(1, stack, programCounter, memory, address),
+    implementation: (runState) => logN(1, runState),
   },
   0xa2: {
     name: 'LOG2',
     minimumGas: 1125,
-    implementation: ({ stack, programCounter, memory, context: { address } }) => logN(2, stack, programCounter, memory, address),
+    implementation: (runState) => logN(2, runState),
   },
   0xa3: {
     name: 'LOG3',
     minimumGas: 1500,
-    implementation: ({ stack, programCounter, memory, context: { address } }) => logN(3, stack, programCounter, memory, address),
+    implementation: (runState) => logN(3, runState),
   },
   0xa4: {
     name: 'LOG4',
     minimumGas: 1875,
-    implementation: ({ stack, programCounter, memory, context: { address } }) => logN(4, stack, programCounter, memory, address),
+    implementation: (runState) => logN(4, runState),
   },
 
   0xf1: {
     name: 'CALL',
     minimumGas: 100,
-    implementation: ({ stack, programCounter, memory, context }) => {
-      const tempStack = [...stack];
+    implementation: (runState) => {
+      if (runState.context.isStatic) return instructions[parseInt("0xfd")].implementation(runState);
+
+      const tempStack = [...runState.stack];
       let callGas = tempStack.pop();
       const toAddress = tempStack.pop();
       const callValue = tempStack.pop();
@@ -2758,47 +2763,48 @@ export const instructions: { [key: number]: Instruction } = {
         typeof retSize == "bigint"
       )) return {
         stack: tempStack,
-        programCounter: programCounter+1,
+        programCounter: runState.programCounter+1,
         continueExecution: false,
         error: "Stack underflow"
       }
 
-      if (callGas > ((context.gasLeft - 100)/64)) callGas = BigInt(((context.gasLeft - 100)/64));
+      if (callGas > (Math.floor(runState.context.gasLeft - 100)/64)) callGas = BigInt(Math.floor((runState.context.gasLeft - 100)/64));
       gasConsumed += Number(callGas);
 
-      const callArgs = readMemorySafely(memory, Number(argsOffset), Number(argsSize));
+      const callArgs = readMemorySafely(runState.memory, Number(argsOffset), Number(argsSize));
       gasConsumed += callArgs.additionalGas;
 
-      const destinationCode = context.state.get(toAddress)?.code?.bin;
+      const destinationCode = runState.context.state.get(toAddress)?.code?.bin;
       if (!destinationCode) return {
         stack: tempStack,
-        programCounter: programCounter+1,
+        programCounter: runState.programCounter+1,
         continueExecution: true,
         error: null
       }
 
       const subContext: Context = {
         address: toAddress,
-        caller: context.address,
-        origin: context.origin,
-        gasPrice: context.gasPrice,
+        caller: runState.context.address,
+        origin: runState.context.origin,
+        isStatic: false,
+        gasPrice: runState.context.gasPrice,
         gasLeft: Number(callGas),
         callValue: callValue,
         callData: callArgs.dataArray,
         bytecode: destinationCode,
-        block: context.block,
-        state: context.state
+        block: runState.context.block,
+        state: runState.context.state
       }
 
       const callResult = evm(subContext);
       gasConsumed -= Number(callGas) - callResult.gas;
 
-      const tempMemory = setMemorySafely(memory, Number(retOffset), callResult.returndata);
+      const tempMemory = setMemorySafely(runState.memory, Number(retOffset), callResult.returndata);
       gasConsumed += tempMemory.additionalGas;
 
       if (!callResult.success) return {
         stack: [...tempStack, 0n],
-        programCounter: programCounter+1,
+        programCounter: runState.programCounter+1,
         memory: tempMemory.memory,
         returndata: callResult.returndata, // this is technically not correct, but I gotta keep the returdata somewhere; I could create another location, but meh?
         additionalGas: gasConsumed,
@@ -2808,7 +2814,7 @@ export const instructions: { [key: number]: Instruction } = {
 
       return {
         stack: [...tempStack, 1n],
-        programCounter: programCounter+1,
+        programCounter: runState.programCounter+1,
         memory: tempMemory.memory,
         returndata: callResult.returndata, // this is technically not correct, but I gotta keep the returdata somewhere; I could create another location, but meh?
         additionalGas: gasConsumed,
@@ -2891,6 +2897,91 @@ export const instructions: { [key: number]: Instruction } = {
         address: context.address, // setting address as same so that it can access this caller's storage
         caller: context.caller,
         origin: context.origin,
+        isStatic: false,
+        gasPrice: context.gasPrice,
+        gasLeft: Number(callGas),
+        callValue: context.callValue,
+        callData: callArgs.dataArray,
+        bytecode: destinationCode,
+        block: context.block,
+        state: context.state
+      }
+
+      const callResult = evm(subContext);
+      gasConsumed -= Number(callGas) - callResult.gas;
+
+      const tempMemory = setMemorySafely(memory, Number(retOffset), callResult.returndata);
+      gasConsumed += tempMemory.additionalGas;
+
+      if (!callResult.success) return {
+        stack: [...tempStack, 0n],
+        programCounter: programCounter+1,
+        memory: tempMemory.memory,
+        returndata: callResult.returndata, // this is technically not correct, but I gotta keep the returdata somewhere; I could create another location, but meh?
+        additionalGas: gasConsumed,
+        continueExecution: true,
+        error: null
+      }
+
+      return {
+        stack: [...tempStack, 1n],
+        programCounter: programCounter+1,
+        memory: tempMemory.memory,
+        returndata: callResult.returndata, // this is technically not correct, but I gotta keep the returdata somewhere; I could create another location, but meh?
+        additionalGas: gasConsumed,
+        continueExecution: true,
+        error: null
+      }
+    }
+  },
+
+  0xfa: {
+    name: 'STATICCALL',
+    minimumGas: 100,
+    implementation: ({ stack, programCounter, memory, context }) => {
+      const tempStack = [...stack];
+      let callGas = tempStack.pop();
+      const toAddress = tempStack.pop();
+      const argsOffset = tempStack.pop();
+      const argsSize = tempStack.pop();
+      const retOffset = tempStack.pop();
+      const retSize = tempStack.pop();
+
+      let gasConsumed = 0;
+
+      if (!(
+        typeof callGas == "bigint" &&
+        typeof toAddress == "bigint" &&
+        typeof argsOffset == "bigint" &&
+        typeof argsSize == "bigint" &&
+        typeof retOffset == "bigint" &&
+        typeof retSize == "bigint"
+      )) return {
+        stack: tempStack,
+        programCounter: programCounter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      if (callGas > (Math.floor(context.gasLeft - 100)/64)) callGas = BigInt(Math.floor((context.gasLeft - 100)/64));
+      gasConsumed += Number(callGas);
+
+      const callArgs = readMemorySafely(memory, Number(argsOffset), Number(argsSize));
+      gasConsumed += callArgs.additionalGas;
+
+      const destinationCode = context.state.get(toAddress)?.code?.bin;
+      if (!destinationCode) return {
+        stack: tempStack,
+        programCounter: programCounter+1,
+        continueExecution: true,
+        error: null
+      }
+
+      const subContext: Context = {
+        address: toAddress,
+        caller: context.address,
+        origin: context.origin,
+        isStatic: true,
         gasPrice: context.gasPrice,
         gasLeft: Number(callGas),
         callValue: context.callValue,
@@ -3001,21 +3092,20 @@ function pushN(n: number, counter: number, bytecode: Uint8Array) {
 }
 
 function logN(
-  n:number,
-  stack: readonly bigint[],
-  programCounter: number,
-  memory: Uint8Array,
-  address: bigint
+  n: number,
+  runState: RunState
 ): InstructionOutput {
 
-  const tempStack = [...stack];
+  if (runState.context.isStatic) return instructions[parseInt("0xFD")].implementation(runState);
+
+  const tempStack = [...runState.stack];
   const offset = tempStack.pop();
   const size = tempStack.pop();
   const topics: bigint[] = [];
 
   if (!(typeof offset == "bigint" && typeof size == "bigint")) return {
     stack: tempStack,
-    programCounter: programCounter+1,
+    programCounter: runState.programCounter+1,
     continueExecution: false,
     error: "Stack underflow"
   }
@@ -3025,7 +3115,7 @@ function logN(
 
     if (typeof topic != "bigint") return {
       stack: tempStack,
-      programCounter: programCounter+1,
+      programCounter: runState.programCounter+1,
       continueExecution: false,
       error: "Stack underflow"
     }
@@ -3033,14 +3123,14 @@ function logN(
     topics.push(topic);
   }
 
-  const result = readMemorySafely(memory, Number(offset), Number(size));
+  const result = readMemorySafely(runState.memory, Number(offset), Number(size));
 
   return {
     stack: tempStack,
     memory: result.memory,
-    programCounter: programCounter+1,
+    programCounter: runState.programCounter+1,
     logs: [{
-      address: address,
+      address: runState.context.address,
       data: result.data,
       topics: topics,
     }],

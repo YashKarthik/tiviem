@@ -13,11 +13,13 @@ export interface Context {
   address: bigint,
   caller: bigint,
   origin: bigint,
+
   gasPrice: bigint,
   gasLeft: number,
+  isStatic: boolean,
+
   callValue: bigint
   callData: Uint8Array
-
   bytecode: Uint8Array,
 
   block: Block,
