@@ -2800,7 +2800,7 @@ export const instructions: { [key: number]: Instruction } = {
         stack: [...tempStack, 0n],
         programCounter: programCounter+1,
         memory: tempMemory.memory,
-        returndata: callResult.returndata,
+        returndata: callResult.returndata, // this is technically not correct, but I gotta keep the returdata somewhere; I could create another location, but meh?
         additionalGas: gasConsumed,
         continueExecution: true,
         error: null
@@ -2810,7 +2810,7 @@ export const instructions: { [key: number]: Instruction } = {
         stack: [...tempStack, 1n],
         programCounter: programCounter+1,
         memory: tempMemory.memory,
-        returndata: callResult.returndata,
+        returndata: callResult.returndata, // this is technically not correct, but I gotta keep the returdata somewhere; I could create another location, but meh?
         additionalGas: gasConsumed,
         continueExecution: true,
         error: null
@@ -2843,6 +2843,89 @@ export const instructions: { [key: number]: Instruction } = {
         error: null
       }
     },
+  },
+
+  0xf4: {
+    name: 'DELEGATECALL',
+    minimumGas: 100,
+    implementation: ({ stack, programCounter, memory, context }) => {
+      const tempStack = [...stack];
+      let callGas = tempStack.pop();
+      const toAddress = tempStack.pop();
+      const argsOffset = tempStack.pop();
+      const argsSize = tempStack.pop();
+      const retOffset = tempStack.pop();
+      const retSize = tempStack.pop();
+
+      let gasConsumed = 100;
+
+      if (!(
+        typeof callGas == "bigint" &&
+        typeof toAddress == "bigint" &&
+        typeof argsOffset == "bigint" &&
+        typeof argsSize == "bigint" &&
+        typeof retOffset == "bigint" &&
+        typeof retSize == "bigint"
+      )) return {
+        stack: tempStack,
+        programCounter: programCounter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      if (callGas > (Math.floor(context.gasLeft - gasConsumed)/64)) callGas = BigInt(Math.floor((context.gasLeft - gasConsumed)/64));
+      gasConsumed += Number(callGas);
+
+      const callArgs = readMemorySafely(memory, Number(argsOffset), Number(argsSize));
+      gasConsumed += callArgs.additionalGas;
+
+      const destinationCode = context.state.get(toAddress)?.code?.bin;
+      if (!destinationCode) return {
+        stack: tempStack,
+        programCounter: programCounter+1,
+        continueExecution: true,
+        error: null
+      }
+
+      const subContext: Context = {
+        address: context.address, // setting address as same so that it can access this caller's storage
+        caller: context.caller,
+        origin: context.origin,
+        gasPrice: context.gasPrice,
+        gasLeft: Number(callGas),
+        callValue: context.callValue,
+        callData: callArgs.dataArray,
+        bytecode: destinationCode,
+        block: context.block,
+        state: context.state
+      }
+
+      const callResult = evm(subContext);
+      gasConsumed -= Number(callGas) - callResult.gas;
+
+      const tempMemory = setMemorySafely(memory, Number(retOffset), callResult.returndata);
+      gasConsumed += tempMemory.additionalGas;
+
+      if (!callResult.success) return {
+        stack: [...tempStack, 0n],
+        programCounter: programCounter+1,
+        memory: tempMemory.memory,
+        returndata: callResult.returndata, // this is technically not correct, but I gotta keep the returdata somewhere; I could create another location, but meh?
+        additionalGas: gasConsumed,
+        continueExecution: true,
+        error: null
+      }
+
+      return {
+        stack: [...tempStack, 1n],
+        programCounter: programCounter+1,
+        memory: tempMemory.memory,
+        returndata: callResult.returndata, // this is technically not correct, but I gotta keep the returdata somewhere; I could create another location, but meh?
+        additionalGas: gasConsumed,
+        continueExecution: true,
+        error: null
+      }
+    }
   },
 
   0xfd: {
