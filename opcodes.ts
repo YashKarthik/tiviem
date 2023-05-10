@@ -5,6 +5,7 @@
   **/
 
 import { keccak256 } from "ethereum-cryptography/keccak";
+import { RLP } from "@ethereumjs/rlp";
 import { Context, evm, Log, RunState } from "./bytecode-parser";
 
 type InstructionOutput = {
@@ -2734,6 +2735,76 @@ export const instructions: { [key: number]: Instruction } = {
     name: 'LOG4',
     minimumGas: 1875,
     implementation: (runState) => logN(4, runState),
+  },
+
+  0xf0: {
+    name: 'CREATE',
+    minimumGas: 32000,
+    implementation: (runState) => {
+      const tempStack = [...runState.stack];
+      const value = tempStack.pop();
+      const offset = tempStack.pop();
+      const size = tempStack.pop();
+      let additionalGasConsumed = 0;
+
+      if (!(typeof value == "bigint" && typeof offset == "bigint" && typeof size == "bigint")) return {
+        stack: tempStack,
+        programCounter: runState.programCounter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      const contractAddress = BigInt(uint8ArrayToByteString(keccak256(RLP.encode([runState.context.caller, runState.context.state.get(runState.context.address)!.nonce])).slice(12,)));
+      const contractBytecode = readMemorySafely(runState.memory, Number(offset), Number(size));
+      additionalGasConsumed += contractBytecode.additionalGas;
+
+      runState.context.state.set(contractAddress, {
+        balance: value,
+        storage: new Map<bigint, bigint>(),
+        nonce: 0n
+      });
+
+      const subContext: Context = {
+        address: contractAddress,         // in the context of the new contract
+        caller: runState.context.address,
+        origin: runState.context.origin,
+        isStatic: false,
+        gasPrice: runState.context.gasPrice,
+        gasLeft: Number(runState.context.gasLeft),
+        callValue: value,
+        callData: new Uint8Array(0),
+        bytecode: contractBytecode.dataArray, // execute initialization code
+        block: runState.context.block,
+        state: runState.context.state
+      }
+
+      const result = evm(subContext);
+
+      if (!result.success) return {
+        stack: [...tempStack, 0n],
+        programCounter: runState.programCounter+1,
+        continueExecution: true,
+        additionalGas: additionalGasConsumed,
+      }
+
+      runState.context.state.set(contractAddress, {
+        balance: value,
+        storage: new Map<bigint, bigint>(),
+        nonce: 0n,
+        code: {
+          asm: null,
+          bin: result.returndata
+        }
+      });
+
+      return {
+        stack: [...tempStack, contractAddress],
+        programCounter: runState.programCounter+1,
+        additionalGas: additionalGasConsumed,
+        continueExecution: true,
+        error: null
+      }
+    }
   },
 
   0xf1: {

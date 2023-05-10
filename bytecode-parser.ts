@@ -33,6 +33,7 @@ export type AccountState = {
     bin: Uint8Array
   },
   storage?: Map<bigint, bigint>,
+  nonce: bigint
 }
 
 type Block = {
@@ -67,6 +68,7 @@ export type Log = {
 
 export function evm(context: Context): Result {
   console.log("\n\n --------------- NEW CONTEXT ---------------\n\n")
+  console.log(context.bytecode);
 
   const runState: RunState = {
     programCounter: 0,
@@ -104,11 +106,11 @@ export function evm(context: Context): Result {
     console.log("\x1b[33m%s\x1b[0m", "0x" + runState.opcode.toString(16), "\x1b[37m%s\x1b[0m", instructions[runState.opcode].name + " @ ", "\x1b[33m%s\x1b[0m", "PC=" + runState.programCounter);
     console.log("Stack:", runState.stack);
     console.log("Memory:", "\x1b[33m%s\x1b[0m", uint8ArrayToByteString(runState.memory));
-    //console.log("State:", runState.context.state);
-    //console.log("Calldata:", runState.context.callData);
-    //console.log("Logs:", runState.logs);
+    console.log("State:", runState.context.state);
+    console.log("Calldata:", runState.context.callData);
+    console.log("Logs:", runState.logs);
     console.log("Returndata:", "\x1b[33m%s\x1b[0m", uint8ArrayToByteString(runState.returndata));
-    //console.log("gas:", runState.context.gasLeft);
+    console.log("gas:", runState.context.gasLeft);
     console.log("\n");
 
     if (result.error) {

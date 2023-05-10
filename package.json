@@ -6,6 +6,7 @@
     "bun-types": "^0.5.0"
   },
   "dependencies": {
+    "@ethereumjs/rlp": "^4.0.1",
     "ethereum-cryptography": "^2.0.0"
   }
 }

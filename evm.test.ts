@@ -31,13 +31,15 @@ for (const t of tests as any) {
               bin: hexStringToUint8Array(accountState.code.bin)
             },
             storage: new Map<bigint, bigint>(),
+            nonce: 0n
           });
           return;
         }
 
         if (!t.state.code) {
           worldState.set(BigInt(address), { 
-            balance: BigInt(accountState.balance)
+            balance: BigInt(accountState.balance),
+            nonce: 0n
           });
           return;
         }
@@ -49,6 +51,7 @@ for (const t of tests as any) {
             bin: hexStringToUint8Array(accountState.code.bin)
           },
           storage: new Map<bigint, bigint>(),
+          nonce: 0n
         });
       });
     }
@@ -63,6 +66,7 @@ for (const t of tests as any) {
         bin: hexStringToUint8Array(t.code.bin)
       },
       storage: new Map<bigint, bigint>(),
+      nonce: 0n
     });
 
     const context: Context = {
