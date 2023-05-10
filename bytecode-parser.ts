@@ -1,4 +1,4 @@
-import { instructions, uint8ArrayToByteString } from "./opcodes";
+import { instructions, uint8ArrayToHexString } from "./opcodes";
 
 type Result = {
   success: boolean,
@@ -105,11 +105,11 @@ export function evm(context: Context): Result {
 
     console.log("\x1b[33m%s\x1b[0m", "0x" + runState.opcode.toString(16), "\x1b[37m%s\x1b[0m", instructions[runState.opcode].name + " @ ", "\x1b[33m%s\x1b[0m", "PC=" + runState.programCounter);
     console.log("Stack:", runState.stack);
-    console.log("Memory:", "\x1b[33m%s\x1b[0m", uint8ArrayToByteString(runState.memory));
+    console.log("Memory:", "\x1b[33m%s\x1b[0m", uint8ArrayToHexString(runState.memory));
     console.log("State:", runState.context.state);
     console.log("Calldata:", runState.context.callData);
     console.log("Logs:", runState.logs);
-    console.log("Returndata:", "\x1b[33m%s\x1b[0m", uint8ArrayToByteString(runState.returndata));
+    console.log("Returndata:", "\x1b[33m%s\x1b[0m", uint8ArrayToHexString(runState.returndata));
     console.log("gas:", runState.context.gasLeft);
     console.log("\n");
 

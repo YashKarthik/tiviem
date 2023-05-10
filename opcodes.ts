@@ -752,7 +752,7 @@ export const instructions: { [key: number]: Instruction } = {
       }
 
       const result = readMemorySafely(memory, Number(offset), Number(size));
-      const hash = BigInt(uint8ArrayToByteString(keccak256(result.dataArray)));
+      const hash = BigInt(uint8ArrayToHexString(keccak256(result.dataArray)));
 
       return {
         stack: [ ...tempStack, hash ],
@@ -846,7 +846,7 @@ export const instructions: { [key: number]: Instruction } = {
         continueExecution: false
       }
 
-      const callDataByteString = uint8ArrayToByteString(callData.slice(Number(i), Number(i+32n))).padEnd(66, "0");
+      const callDataByteString = uint8ArrayToHexString(callData.slice(Number(i), Number(i+32n))).padEnd(66, "0");
 
       return {
         programCounter: programCounter+1,
@@ -1130,7 +1130,7 @@ export const instructions: { [key: number]: Instruction } = {
       }
 
       const extCode = account.code?.bin;
-      const codeHash = BigInt(uint8ArrayToByteString(keccak256(extCode || new Uint8Array(0))));
+      const codeHash = BigInt(uint8ArrayToHexString(keccak256(extCode || new Uint8Array(0))));
 
       return {
         programCounter: programCounter+1,
@@ -2756,7 +2756,7 @@ export const instructions: { [key: number]: Instruction } = {
         error: "Stack underflow"
       }
 
-      const contractAddress = BigInt(uint8ArrayToByteString(keccak256(RLP.encode([runState.context.caller, runState.context.state.get(runState.context.address)!.nonce])).slice(12,)));
+      const contractAddress = BigInt(uint8ArrayToHexString(keccak256(RLP.encode([runState.context.caller, runState.context.state.get(runState.context.address)!.nonce])).slice(12,)));
       const contractBytecode = readMemorySafely(runState.memory, Number(offset), Number(size));
       additionalGasConsumed += contractBytecode.additionalGas;
 
@@ -2794,7 +2794,6 @@ export const instructions: { [key: number]: Instruction } = {
         storage: new Map<bigint, bigint>(),
         nonce: 0n,
         code: {
-          asm: null,
           bin: result.returndata
         }
       });
@@ -3008,6 +3007,78 @@ export const instructions: { [key: number]: Instruction } = {
     }
   },
 
+  0xf5: {
+    name: 'CREATE2',
+    minimumGas: 32000,
+    implementation: (runState) => {
+      if (runState.context.isStatic) return instructions[parseInt("0xfd")].implementation(runState);
+
+      const tempStack = [...runState.stack];
+      const value = tempStack.pop();
+      const offset = tempStack.pop();
+      const size = tempStack.pop();
+      const salt = tempStack.pop();
+      let additionalGasConsumed = 0;
+
+      if (!(typeof value == "bigint" && typeof offset == "bigint" && typeof size == "bigint" && typeof salt == "bigint")) return {
+        stack: tempStack,
+        programCounter: runState.programCounter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      const initializationBytecode = readMemorySafely(runState.memory, Number(offset), Number(size));
+      const contractAddress = BigInt(uint8ArrayToHexString(keccak256(hexStringToUint8Array("ff" + runState.context.caller.toString(16) + uint8ArrayToHexString(keccak256(initializationBytecode.dataArray)).slice(2,))).slice(12,)));
+      additionalGasConsumed += initializationBytecode.additionalGas;
+
+      runState.context.state.set(contractAddress, {
+        balance: value,
+        storage: new Map<bigint, bigint>(),
+        nonce: 0n
+      });
+
+      const subContext: Context = {
+        address: contractAddress,         // in the context of the new contract
+        caller: runState.context.address,
+        origin: runState.context.origin,
+        isStatic: false,
+        gasPrice: runState.context.gasPrice,
+        gasLeft: Number(runState.context.gasLeft),
+        callValue: value,
+        callData: new Uint8Array(0),
+        bytecode: initializationBytecode.dataArray, // execute initialization code
+        block: runState.context.block,
+        state: runState.context.state
+      }
+
+      const result = evm(subContext);
+
+      if (!result.success) return {
+        stack: [...tempStack, 0n],
+        programCounter: runState.programCounter+1,
+        continueExecution: true,
+        additionalGas: additionalGasConsumed,
+      }
+
+      runState.context.state.set(contractAddress, {
+        balance: value,
+        storage: new Map<bigint, bigint>(),
+        nonce: 0n,
+        code: {
+          bin: result.returndata
+        }
+      });
+
+      return {
+        stack: [...tempStack, contractAddress],
+        programCounter: runState.programCounter+1,
+        additionalGas: additionalGasConsumed,
+        continueExecution: true,
+        error: null
+      }
+    }
+  },
+
   0xfa: {
     name: 'STATICCALL',
     minimumGas: 100,
@@ -3189,7 +3260,7 @@ function swapN(n: number, stack: bigint[]) {
 function pushN(n: number, counter: number, bytecode: Uint8Array) {
   counter += 1;
   const bytesToBePushed = bytecode.slice(counter, counter+n);
-  let byteString = uint8ArrayToByteString(bytesToBePushed);
+  let byteString = uint8ArrayToHexString(bytesToBePushed);
 
   const valueToBePushed = BigInt(byteString);
   counter += n;
@@ -3270,7 +3341,7 @@ function getValidJumpDests(code: Uint8Array) {
   return jumps
 }
 
-export function uint8ArrayToByteString(bytesArr:Uint8Array): string {
+export function uint8ArrayToHexString(bytesArr:Uint8Array): string {
   let byteString = "0x";
   bytesArr.forEach(byte => byteString = byteString + byte.toString(16).padStart(2, "0"));
   if (byteString == "0x") return "0x00";
@@ -3303,7 +3374,7 @@ function readMemorySafely(memory:Uint8Array, offset: number, size: number): { da
 
   if (bytesFromMemory.length == size) {
     return {
-      data: BigInt(uint8ArrayToByteString(bytesFromMemory)),
+      data: BigInt(uint8ArrayToHexString(bytesFromMemory)),
       dataArray: bytesFromMemory,
       memory: memory,
       additionalGas: 0
@@ -3313,7 +3384,7 @@ function readMemorySafely(memory:Uint8Array, offset: number, size: number): { da
   const result = expandMemory(memory, offset+size);
   const fullSizedBytesFromMemory = result.memory.slice(offset, offset+size);
   return {
-    data: BigInt(uint8ArrayToByteString(fullSizedBytesFromMemory)),
+    data: BigInt(uint8ArrayToHexString(fullSizedBytesFromMemory)),
     dataArray: fullSizedBytesFromMemory,
     memory: result.memory,
     additionalGas: result.gasCost

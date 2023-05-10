@@ -1,6 +1,6 @@
 # tiviem
 
-A rudimentary implementation of EVM in Typescript /ti:vi:εm/. Building during [Nights & Weekends S3](https://buildspace.so/).
+A rudimentary implementation of EVM in Typescript /ti:vi:εm/.
 
 I'm still figuring this out, help is appreciated!
 
@@ -15,8 +15,11 @@ Here's my plan for building this:
   - [X] Read up on signed vs unsigned operations. I thikn I understand this, but still.
   - [X] Implement memory
   - [X] Implement storage
-- [X] After this I guess I'll work on the gas mechanism that will prevent infinite loops and network spam. (except REVERT)
+- [X] After this I guess I'll work on the gas mechanism that will prevent infinite loops and network spam.
 - [ ] Work on returning state to initial value when REVERT-ed.
+- [ ] clean up
+- [ ] Ensure gas and ether transfers actually work
+- [ ] more tests
 
 ## Development
 Clone repo and install dependencies using:
