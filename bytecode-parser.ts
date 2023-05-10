@@ -29,7 +29,7 @@ export interface Context {
 export type AccountState = {
   balance: bigint,
   code?: {
-    asm: string | null,
+    asm?: string,
     bin: Uint8Array
   },
   storage?: Map<bigint, bigint>,

@@ -23,34 +23,13 @@ for (const t of tests as any) {
       addresses.forEach(address => {
         const accountState = t.state[address];
 
-        if (!accountState.balance) {
-          worldState.set(BigInt(address), {
-            balance: 0n,
-            code: {
-              asm: accountState.code.asm || null,
-              bin: hexStringToUint8Array(accountState.code.bin)
-            },
-            storage: new Map<bigint, bigint>(),
-            nonce: 0n
-          });
-          return;
-        }
-
-        if (!t.state.code) {
-          worldState.set(BigInt(address), { 
-            balance: BigInt(accountState.balance),
-            nonce: 0n
-          });
-          return;
-        }
-
         worldState.set(BigInt(address), {
-          balance: BigInt(accountState!.balance),
+          balance: BigInt(accountState.balance || 0n),
           code: {
-            asm: accountState.code.asm || null,
-            bin: hexStringToUint8Array(accountState.code.bin)
-          },
-          storage: new Map<bigint, bigint>(),
+            asm: accountState?.code?.asm,
+            bin: hexStringToUint8Array(accountState?.code?.bin)
+          } || undefined,
+          storage: accountState.code ? new Map<bigint, bigint>(): undefined,
           nonce: 0n
         });
       });

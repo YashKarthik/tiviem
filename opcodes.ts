@@ -2741,6 +2741,8 @@ export const instructions: { [key: number]: Instruction } = {
     name: 'CREATE',
     minimumGas: 32000,
     implementation: (runState) => {
+      if (runState.context.isStatic) return instructions[parseInt("0xfd")].implementation(runState);
+
       const tempStack = [...runState.stack];
       const value = tempStack.pop();
       const offset = tempStack.pop();
@@ -2811,7 +2813,7 @@ export const instructions: { [key: number]: Instruction } = {
     name: 'CALL',
     minimumGas: 100,
     implementation: (runState) => {
-      if (runState.context.isStatic) return instructions[parseInt("0xfd")].implementation(runState);
+      if (runState.context.isStatic && runState.context.callValue != 0n) return instructions[parseInt("0xfd")].implementation(runState);
 
       const tempStack = [...runState.stack];
       let callGas = tempStack.pop();
@@ -3128,6 +3130,42 @@ export const instructions: { [key: number]: Instruction } = {
         continueExecution: false,
         stack: [],
         error: "Stack underflow"
+      }
+    }
+  },
+
+  0xff: {
+    name: 'SELFDESTRUCT',
+    minimumGas: 5000,
+    implementation: (runState) => {
+      if (runState.context.isStatic) return instructions[parseInt("0xFD")].implementation(runState);
+
+      const tempStack = [...runState.stack];
+      const toAddress = tempStack.pop();
+
+      if (typeof toAddress != "bigint") return {
+        stack: tempStack,
+        programCounter: runState.programCounter+1,
+        continueExecution: false,
+        error: "Stack underflow"
+      }
+
+      const prevStateOfToAddress = runState.context.state.get(toAddress);
+
+      runState.context.state.set(toAddress, {
+        balance: (prevStateOfToAddress?.balance || 0n) + runState.context.state.get(runState.context.address)!.balance,
+        nonce: (prevStateOfToAddress?.nonce || 0n),
+        storage: prevStateOfToAddress?.storage,
+        code: prevStateOfToAddress?.code
+      });
+
+      console.log(runState.context.state.delete(runState.context.address));
+
+      return {
+        stack: tempStack,
+        programCounter: runState.programCounter+1,
+        continueExecution: true,
+        error: null
       }
     }
   }
