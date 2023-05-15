@@ -6,7 +6,7 @@
 
 import { keccak256 } from "ethereum-cryptography/keccak";
 import { RLP } from "@ethereumjs/rlp";
-import { Context, evm, Log, RunState } from "./bytecode-parser";
+import { AccountState, Context, evm, Log, RunState } from "./bytecode-parser";
 
 type InstructionOutput = {
   stack: bigint[],
@@ -17,6 +17,7 @@ type InstructionOutput = {
   additionalGas?: number,
   returndata?: Uint8Array,
   logs?: Log[],
+  state?: Map<bigint, AccountState>,
 }
 
 interface Instruction {
@@ -1378,9 +1379,10 @@ export const instructions: { [key: number]: Instruction } = {
     name: 'SSTORE',
     minimumGas: 100,
     implementation: (runState) => {
-
       if (runState.context.isStatic) return instructions[parseInt("0xfd")].implementation(runState);
 
+      const tempState = new Map(runState.context.state);
+      const tempStorage = tempState.get(runState.context.address)!.storage!
       const tempStack = [...runState.stack];
       const key = tempStack.pop();
       const value = tempStack.pop();
@@ -1392,12 +1394,12 @@ export const instructions: { [key: number]: Instruction } = {
         error: "Stack underflow"
       }
 
-      const storage = runState.context.state.get(runState.context.address)!.storage!;
-      storage.set(key, value);
-      console.log("From SSTORE:", storage);
+      tempStorage.set(key, value);
+      console.log("From SSTORE:", tempStorage);
 
       return {
         stack: [...tempStack],
+        state: tempState,
         programCounter: runState.programCounter+1,
         continueExecution: true,
         error: null
@@ -2874,7 +2876,10 @@ export const instructions: { [key: number]: Instruction } = {
       const tempMemory = setMemorySafely(runState.memory, Number(retOffset), callResult.returndata);
       gasConsumed += tempMemory.additionalGas;
 
+      const tempState = callResult.state;
+
       if (!callResult.success) return {
+        // since call reverted, we DON'T apply the state changes we got back.
         stack: [...tempStack, 0n],
         programCounter: runState.programCounter+1,
         memory: tempMemory.memory,
@@ -2887,6 +2892,7 @@ export const instructions: { [key: number]: Instruction } = {
       return {
         stack: [...tempStack, 1n],
         programCounter: runState.programCounter+1,
+        state: tempState,
         memory: tempMemory.memory,
         returndata: callResult.returndata, // this is technically not correct, but I gotta keep the returdata somewhere; I could create another location, but meh?
         additionalGas: gasConsumed,

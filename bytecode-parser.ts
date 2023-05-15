@@ -1,3 +1,4 @@
+import { stat } from "fs";
 import { instructions, uint8ArrayToHexString } from "./opcodes";
 
 type Result = {
@@ -7,6 +8,7 @@ type Result = {
   gas: number,
   returndata: Uint8Array,
   logs: Log[],
+  state: Map<bigint, AccountState>,
 }
 
 export interface Context {
@@ -84,24 +86,32 @@ export function evm(context: Context): Result {
     runState.opcode = context.bytecode[runState.programCounter] as keyof typeof instructions;
     const result = instructions[runState.opcode].implementation(runState);
 
+    // Operation returns th new state and other data;
+    // We discard the changes if the calculated gas consumption is more than whan we have
+    runState.context.gasLeft -= instructions[runState.opcode].minimumGas;
+    if (result.additionalGas) runState.context.gasLeft -= result.additionalGas;
+    if (runState.context.gasLeft < 0) {
+      console.log("------- OUT OF GAS ------");
+      //return {
+      //  success: false,
+      //  stack: runState.stack.reverse(),
+      //  memory: runState.memory,
+      //  gas: runState.context.gasLeft,
+      //  returndata: runState.returndata,
+      //  logs: runState.logs,
+      //  state: runState.context.state,
+      //}
+    }
+
+    // Since we didn't run out of gas, we shall assign the calculated state (and other data) to our context's data;
+
     runState.stack = result.stack;
     runState.programCounter = result.programCounter;
     if (result.memory) runState.memory = result.memory;
     if (result.returndata) runState.returndata = result.returndata;
     if (result.logs) runState.logs.push(...result.logs);
+    if (result.state) runState.context.state = result.state;
 
-    // Check if operation is reverted before or after performing it,
-    // as it will affect the current state of memory, stack
-    runState.context.gasLeft -= instructions[runState.opcode].minimumGas;
-    if (result.additionalGas) runState.context.gasLeft -= result.additionalGas;
-    //if (runState.context.gasLeft < 0) return {
-    //  success: false,
-    //  stack: runState.stack.reverse(),
-    //  memory: runState.memory,
-    //  gas: runState.context.gasLeft,
-    //  returndata: runState.returndata,
-    //  logs: runState.logs,
-    //}
 
     console.log("\x1b[33m%s\x1b[0m", "0x" + runState.opcode.toString(16), "\x1b[37m%s\x1b[0m", instructions[runState.opcode].name + " @ ", "\x1b[33m%s\x1b[0m", "PC=" + runState.programCounter);
     console.log("Stack:", runState.stack);
@@ -123,11 +133,13 @@ export function evm(context: Context): Result {
         gas: runState.context.gasLeft,
         returndata: runState.returndata,
         logs: runState.logs,
+        state: runState.context.state
       }
     }
     if (!result.continueExecution) break;
   }
 
+  console.log("---------- End of context: ----------");
   console.log("Final stack:", runState.stack.map(s => "0x" + s.toString(16)));
   console.log("Returndata:", runState.returndata);
   return {
@@ -136,6 +148,7 @@ export function evm(context: Context): Result {
     memory: runState.memory,
     gas: runState.context.gasLeft,
     returndata: runState.returndata,
-    logs: runState.logs
+    logs: runState.logs,
+    state: runState.context.state
   }
 }
