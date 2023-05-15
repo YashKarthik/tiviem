@@ -16,6 +16,7 @@ Here's my plan for building this:
   - [X] Implement memory
   - [X] Implement storage
 - [X] After this I guess I'll work on the gas mechanism that will prevent infinite loops and network spam.
+- [X] Make state changing functions more pure/functional.
 - [ ] Work on returning state to initial value when REVERT-ed.
 - [ ] clean up
 - [ ] Ensure gas and ether transfers actually work

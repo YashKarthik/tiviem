@@ -1,4 +1,3 @@
-import { stat } from "fs";
 import { instructions, uint8ArrayToHexString } from "./opcodes";
 
 type Result = {
@@ -68,8 +67,8 @@ export type Log = {
   topics: bigint[],
 }
 
-export function evm(context: Context): Result {
-  console.log("\n\n --------------- NEW CONTEXT ---------------\n\n")
+export function evm(context: Context, verbose = 1): Result {
+  console.log('\x1b[32m%s\x1b[0m', "\n\n --------------- NEW CONTEXT ---------------\n\n")
   console.log(context.bytecode);
 
   const runState: RunState = {
@@ -112,19 +111,23 @@ export function evm(context: Context): Result {
     if (result.logs) runState.logs.push(...result.logs);
     if (result.state) runState.context.state = result.state;
 
-
-    console.log("\x1b[33m%s\x1b[0m", "0x" + runState.opcode.toString(16), "\x1b[37m%s\x1b[0m", instructions[runState.opcode].name + " @ ", "\x1b[33m%s\x1b[0m", "PC=" + runState.programCounter);
-    console.log("Stack:", runState.stack);
-    console.log("Memory:", "\x1b[33m%s\x1b[0m", uint8ArrayToHexString(runState.memory));
-    console.log("State:", runState.context.state);
-    console.log("Calldata:", runState.context.callData);
-    console.log("Logs:", runState.logs);
-    console.log("Returndata:", "\x1b[33m%s\x1b[0m", uint8ArrayToHexString(runState.returndata));
-    console.log("gas:", runState.context.gasLeft);
-    console.log("\n");
+    if (verbose >= 1) {
+      console.log("\x1b[33m%s\x1b[0m", "0x" + runState.opcode.toString(16), "\x1b[0m%s\x1b[0m", instructions[runState.opcode].name + " @ ", "\x1b[33m%s\x1b[0m", "PC=" + runState.programCounter);
+    }
+    if (verbose >= 2) {
+      console.log("Stack:", runState.stack);
+      console.log("Memory:", "\x1b[33m%s\x1b[0m", uint8ArrayToHexString(runState.memory));
+      console.log("Gas:", runState.context.gasLeft, "\n");
+    }
+    if (verbose >= 3) {
+      console.log("State:", runState.context.state);
+      console.log("Calldata:", runState.context.callData);
+      console.log("Logs:", runState.logs);
+      console.log("Returndata:", "\x1b[33m%s\x1b[0m", uint8ArrayToHexString(runState.returndata), "\n");
+    }
 
     if (result.error) {
-      console.log("---------- Fatal Error ----------");
+      console.log('\x1b[31m%s\x1b[0m', '---------- Fatal Error ----------');
       console.log(result.error);
       return {
         success: false,
@@ -139,9 +142,9 @@ export function evm(context: Context): Result {
     if (!result.continueExecution) break;
   }
 
-  console.log("---------- End of context: ----------");
+  console.log('\x1b[32m%s\x1b[0m', "\n\n --------------- END of CONTEXT ---------------\n\n")
   console.log("Final stack:", runState.stack.map(s => "0x" + s.toString(16)));
-  console.log("Returndata:", runState.returndata);
+  console.log("Returndata:", runState.returndata, "\n");
   return {
     success: true,
     stack: runState.stack.reverse(),
