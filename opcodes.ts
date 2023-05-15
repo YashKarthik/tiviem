@@ -2791,7 +2791,9 @@ export const instructions: { [key: number]: Instruction } = {
         additionalGas: additionalGasConsumed,
       }
 
-      runState.context.state.set(contractAddress, {
+      const tempState = result.state;
+
+      tempState.set(contractAddress, {
         balance: value,
         storage: new Map<bigint, bigint>(),
         nonce: 0n,
@@ -2802,6 +2804,7 @@ export const instructions: { [key: number]: Instruction } = {
 
       return {
         stack: [...tempStack, contractAddress],
+        state: tempState,
         programCounter: runState.programCounter+1,
         additionalGas: additionalGasConsumed,
         continueExecution: true,
@@ -2991,6 +2994,8 @@ export const instructions: { [key: number]: Instruction } = {
       const tempMemory = setMemorySafely(memory, Number(retOffset), callResult.returndata);
       gasConsumed += tempMemory.additionalGas;
 
+      const tempState = callResult.state;
+
       if (!callResult.success) return {
         stack: [...tempStack, 0n],
         programCounter: programCounter+1,
@@ -3004,6 +3009,7 @@ export const instructions: { [key: number]: Instruction } = {
       return {
         stack: [...tempStack, 1n],
         programCounter: programCounter+1,
+        state: tempState,
         memory: tempMemory.memory,
         returndata: callResult.returndata, // this is technically not correct, but I gotta keep the returdata somewhere; I could create another location, but meh?
         additionalGas: gasConsumed,
@@ -3066,7 +3072,9 @@ export const instructions: { [key: number]: Instruction } = {
         additionalGas: additionalGasConsumed,
       }
 
-      runState.context.state.set(contractAddress, {
+      const tempState = result.state;
+
+      tempState.set(contractAddress, {
         balance: value,
         storage: new Map<bigint, bigint>(),
         nonce: 0n,
@@ -3077,6 +3085,7 @@ export const instructions: { [key: number]: Instruction } = {
 
       return {
         stack: [...tempStack, contractAddress],
+        state: tempState,
         programCounter: runState.programCounter+1,
         additionalGas: additionalGasConsumed,
         continueExecution: true,
