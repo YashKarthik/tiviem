@@ -72,7 +72,7 @@ for (const t of tests as any) {
       state: worldState,
     }
 
-    const result = evm(context);
+    const result = evm(context, 3);
 
     expect(result.success).toEqual(t.expect.success);
 

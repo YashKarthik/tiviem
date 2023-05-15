@@ -68,8 +68,7 @@ export type Log = {
 }
 
 export function evm(context: Context, verbose = 1): Result {
-  console.log('\x1b[32m%s\x1b[0m', "\n\n --------------- NEW CONTEXT ---------------\n\n")
-  console.log(context.bytecode);
+  console.log('\x1b[32m%s\x1b[0m', "\n --------------- NEW CONTEXT ---------------\n")
 
   const runState: RunState = {
     programCounter: 0,
@@ -112,7 +111,7 @@ export function evm(context: Context, verbose = 1): Result {
     if (result.state) runState.context.state = result.state;
 
     if (verbose >= 1) {
-      console.log("\x1b[33m%s\x1b[0m", "0x" + runState.opcode.toString(16), "\x1b[0m%s\x1b[0m", instructions[runState.opcode].name + " @ ", "\x1b[33m%s\x1b[0m", "PC=" + runState.programCounter);
+      console.log("\x1b[33m%s\x1b[0m", "0x" + runState.opcode.toString(16), "\x1b[0m%s\x1b[0m", instructions[runState.opcode].name + " @ ", "\x1b[33m%s\x1b[0m", "PC=" + runState.programCounter, "\n");
     }
     if (verbose >= 2) {
       console.log("Stack:", runState.stack);
@@ -127,7 +126,7 @@ export function evm(context: Context, verbose = 1): Result {
     }
 
     if (result.error) {
-      console.log('\x1b[31m%s\x1b[0m', '---------- Fatal Error ----------');
+      console.log('\x1b[31m%s\x1b[0m', '\n---------- Fatal Error ----------');
       console.log(result.error);
       return {
         success: false,
@@ -142,7 +141,7 @@ export function evm(context: Context, verbose = 1): Result {
     if (!result.continueExecution) break;
   }
 
-  console.log('\x1b[32m%s\x1b[0m', "\n\n --------------- END of CONTEXT ---------------\n\n")
+  console.log('\x1b[32m%s\x1b[0m', "\n --------------- END of CONTEXT ---------------\n")
   console.log("Final stack:", runState.stack.map(s => "0x" + s.toString(16)));
   console.log("Returndata:", runState.returndata, "\n");
   return {
