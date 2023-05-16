@@ -36,6 +36,7 @@ for (const t of tests as any) {
     }
 
     const CONTRACT_ADDRESS = BigInt(t?.tx?.to || 0xff);
+    const CALLER_ADDRESS = BigInt(t?.tx?.from || 0x00);
 
     // always initialize the `to` contract's state, the one for whom our evm is executing stuff;
     worldState.set(CONTRACT_ADDRESS, {
@@ -48,9 +49,28 @@ for (const t of tests as any) {
       nonce: 0n
     });
 
+    if (worldState.get(CALLER_ADDRESS)?.code?.bin) {
+      worldState.set(CALLER_ADDRESS, {
+        balance: worldState.get(CALLER_ADDRESS)?.balance || 0n,
+        code: {
+          asm: worldState.get(CALLER_ADDRESS)?.code?.asm,
+          bin: worldState.get(CALLER_ADDRESS)!.code!.bin
+        },
+        storage: new Map<bigint, bigint>(),
+        nonce: 0n
+      });
+    } else {
+      worldState.set(CALLER_ADDRESS, {
+        balance: worldState.get(CALLER_ADDRESS)?.balance || 0n,
+        storage: new Map<bigint, bigint>(),
+        nonce: 0n
+      });
+
+    }
+
     const context: Context = {
       address: CONTRACT_ADDRESS,
-      caller: BigInt(t?.tx?.from || 0x00),
+      caller: CALLER_ADDRESS,
       origin: BigInt(t?.tx?.origin || 0x00),
 
       callValue: BigInt(t?.tx?.value || 0n),

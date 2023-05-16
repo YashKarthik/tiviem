@@ -82,14 +82,57 @@ export function evm(context: Context, verbose = 1): Result {
 
   for (runState.programCounter = 0; runState.programCounter < context.bytecode.length; ) {
     runState.opcode = context.bytecode[runState.programCounter] as keyof typeof instructions;
+
+    if (runState.context.callValue > runState.context.state.get(runState.context.caller)!.balance) {
+      console.log('\x1b[31m%s\x1b[0m', '\n------- OUT OF ETHER ------\n');
+      //return {
+      //  success: false,
+      //  stack: runState.stack.reverse(),
+      //  memory: runState.memory,
+      //  gas: runState.context.gasLeft,
+      //  returndata: runState.returndata,
+      //  logs: runState.logs,
+      //  state: runState.context.state,
+      //}
+    }
+
+    // subtract callvalue from caller's balance
+    if (runState.context.state.get(runState.context.caller)?.code) {
+      if (runState.context.state.get(runState.context.caller)?.storage) {
+        runState.context.state.set(runState.context.caller, {
+          balance: runState.context.state.get(runState.context.caller)!.balance - runState.context.callValue,
+          nonce: runState.context.state.get(runState.context.caller)!.nonce,
+          code: {
+            asm: runState.context.state.get(runState.context.caller)!.code?.asm,
+            bin: runState.context.state.get(runState.context.caller)!.code!.bin
+          },
+          storage: runState.context.state.get(runState.context.caller)!.storage
+        });
+      } else {
+        runState.context.state.set(runState.context.caller, {
+          balance: runState.context.state.get(runState.context.caller)!.balance - runState.context.callValue,
+          nonce: runState.context.state.get(runState.context.caller)!.nonce,
+          code: {
+            asm: runState.context.state.get(runState.context.caller)!.code?.asm,
+            bin: runState.context.state.get(runState.context.caller)!.code!.bin
+          },
+        });
+      }
+    } else {
+      runState.context.state.set(runState.context.caller, {
+        balance: runState.context.state.get(runState.context.caller)!.balance - runState.context.callValue,
+        nonce: runState.context.state.get(runState.context.caller)!.nonce,
+      });
+    }
+
     const result = instructions[runState.opcode].implementation(runState);
 
-    // Operation returns th new state and other data;
+    // Operation returns the new state and other data;
     // We discard the changes if the calculated gas consumption is more than whan we have
     runState.context.gasLeft -= instructions[runState.opcode].minimumGas;
     if (result.additionalGas) runState.context.gasLeft -= result.additionalGas;
     if (runState.context.gasLeft < 0) {
-      console.log("------- OUT OF GAS ------");
+      console.log('\x1b[31m%s\x1b[0m', '\n------- OUT OF GAS ------\n');
       //return {
       //  success: false,
       //  stack: runState.stack.reverse(),
@@ -111,10 +154,10 @@ export function evm(context: Context, verbose = 1): Result {
     if (result.state) runState.context.state = result.state;
 
     if (verbose >= 1) {
-      console.log("\x1b[33m%s\x1b[0m", "0x" + runState.opcode.toString(16), "\x1b[0m%s\x1b[0m", instructions[runState.opcode].name + " @ ", "\x1b[33m%s\x1b[0m", "PC=" + runState.programCounter, "\n");
+      console.log("\x1b[33m%s\x1b[0m", "0x" + runState.opcode.toString(16), "\x1b[0m%s\x1b[0m", instructions[runState.opcode].name + " @ ", "\x1b[33m%s\x1b[0m", "PC=" + runState.programCounter);
     }
     if (verbose >= 2) {
-      console.log("Stack:", runState.stack);
+      console.log("\nStack:", runState.stack);
       console.log("Memory:", "\x1b[33m%s\x1b[0m", uint8ArrayToHexString(runState.memory));
       console.log("Gas:", runState.context.gasLeft, "\n");
     }

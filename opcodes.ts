@@ -2817,8 +2817,6 @@ export const instructions: { [key: number]: Instruction } = {
     name: 'CALL',
     minimumGas: 100,
     implementation: (runState) => {
-      if (runState.context.isStatic && runState.context.callValue != 0n) return instructions[parseInt("0xfd")].implementation(runState);
-
       const tempStack = [...runState.stack];
       let callGas = tempStack.pop();
       const toAddress = tempStack.pop();
@@ -2844,6 +2842,8 @@ export const instructions: { [key: number]: Instruction } = {
         continueExecution: false,
         error: "Stack underflow"
       }
+      if (runState.context.isStatic && callValue != 0n) return instructions[parseInt("0xfd")].implementation(runState);
+      if (callValue > runState.context.state.get(runState.context.address)!.balance) return instructions[parseInt("0xfd")].implementation(runState);
 
       if (callGas > (Math.floor(runState.context.gasLeft - 100)/64)) callGas = BigInt(Math.floor((runState.context.gasLeft - 100)/64));
       gasConsumed += Number(callGas);
