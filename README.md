@@ -50,6 +50,9 @@ This year I had planned to dive deep into the Ethereum core and what better way 
 - See [blog post](https://www.yashkarthik.xyz/archive/building-tiviem-0) for reasoning on some technical decisions I made.
 - I've attempted to write fairly functional-style code, I deviate in places where I had to wack my head against my keyboard.
 - If you're planning on building an EVM I've left some resources below. Feel free to contact me ([twitter](https://twitter.com/_yashkarthik)/[warpcast](https://warpcast.com/yashkarthik))
+- Gas accounting and state revertions (REVERT) may not work. I haven't figured out a way to test this other than console-logging heavily (my eyes are scared of hex now!!).
+
+## Useful stuff
 
 - [learnevm.com](https://learnevm.com)
 - [Yellow Paper](https://ethereum.github.io/yellowpaper/paper.pdf)
